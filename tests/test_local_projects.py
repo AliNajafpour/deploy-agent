@@ -63,12 +63,12 @@ class LocalProjectChecks(unittest.TestCase):
         self.assertEqual(self.cloud.fetch('fixture-app', '/health').json()['status'], 'ok')
         self.assertGreater(self.cloud.process_count, 0)
 
-    def test_missing_port_asks_user_and_never_creates_an_app(self):
+    def test_missing_port_is_resolved_without_a_technical_question(self):
         result = self.deploy('03-missing-port', port=None)
-        self.assertEqual(result['status'], 'needs_input')
-        self.assertTrue(result['plan']['questions'])
-        self.assertEqual(self.cloud.mutations, [])
-        self.assertEqual(self.cloud.process_count, 0)
+        self.assertEqual(result['status'], 'completed')
+        self.assertFalse(result['plan']['questions'])
+        self.assertEqual(result['context']['port'],3000)
+        self.assertEqual(self.cloud.fetch('fixture-app','/health').status_code,200)
 
     def test_user_can_supply_missing_port_then_deploy(self):
         result = self.deploy('03-missing-port', port=3000)

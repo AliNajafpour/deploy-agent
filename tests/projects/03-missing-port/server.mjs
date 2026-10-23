@@ -1,5 +1,5 @@
 import {createServer} from 'node:http';
-// Deliberately no default: the user must choose the deployment port.
+// Deliberately no default: the deployment agent must configure the port.
 const port = Number(process.env.PORT);
 if (!Number.isInteger(port) || port < 1) throw new Error('PORT must be supplied');
 createServer((request, response) => {

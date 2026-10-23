@@ -71,16 +71,10 @@ def check_project(fixture, provider):
             message='این پروژه را منتشر کن. فقط ساخت برنامه در صورت نیاز و انتشار سورس را پیشنهاد بده. پیش از تغییر، طرح را برای تأیید نشان بده.'
             port=8080 if fixture=='01-static' else 3000
             actions=['deploy'] if fixture=='05-http500-fixed' else ['create_app','deploy']
-            answer_to=None
             if fixture=='03-missing-port':
-                run=request(message,intent='deploy',source=fixture)
-                assert run['status']=='needs_input' and run['plan']['questions']
-                assert cloud.mutations==[] and cloud.process_count==0
-                record['checks']['missing_port_question_without_mutation']=True
-                answer_to=run['id']
-                message='در پاسخ به سؤال پورت: پورت 3000 را انتخاب می‌کنم. حالا همان پروژه را منتشر کن؛ ساخت و انتشار فقط پس از تأیید طرح.'
+                port=None
             run=request(message,intent='deploy',source=fixture,port=port,actions=actions,
-                        allow_env_question=fixture in {'04-missing-env','08-worker-sqlite'},answer_to=answer_to)
+                        allow_env_question=fixture in {'04-missing-env','08-worker-sqlite'})
             if fixture=='04-missing-env' and run['status']=='needs_input':
                 record['checks']['model_asked_environment_choice_without_mutation']=True
                 run=request('در پاسخ به سؤال APP_GREETING: برای بازتولید خرابی در این برنامهٔ آزمایشی، عمداً فعلاً این متغیر را تنظیم نکن. فقط ساخت برنامه و انتشار سورس را پیشنهاد بده و پیش از اجرا تأیید بگیر.',
@@ -103,7 +97,8 @@ def check_project(fixture, provider):
                 record['checks']['real_node_and_no_inherited_credentials']=True
             elif fixture=='03-missing-port':
                 assert cloud.fetch(name,'/health').status_code==200
-                record['checks']['user_answer_led_to_healthy_deploy']=True
+                assert run['context']['port']==3000 and not run['plan']['questions']
+                record['checks']['automatic_settings_led_to_healthy_deploy']=True
             elif fixture=='04-missing-env':
                 assert cloud.fetch(name,'/health').status_code==503
                 run=request('سرویس سالم بالا نیامده است؛ لاگ و سلامت را بررسی کن. اگر APP_GREETING لازم است، مقدارش را از ارجاع سرور LYARA_DEPLOY_APP_GREETING بگیر، تنظیمش کن و سپس یک بار ری‌استارت کن. قبل از تغییر تأیید بگیر.',actions=['update_env','restart'])

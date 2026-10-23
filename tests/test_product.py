@@ -27,12 +27,12 @@ class ProductChecks(unittest.TestCase):
 
     def deploy(self,port=80):
         return self.service.start(RunRequest(message='Deploy this source',intent='deploy',
-            project='new-app',plan_id='demo-plan',port=port,platform='static'))
+            project='new-app',plan_id='demo-plan' if port is not None else '',port=port,platform='static'))
 
     def test_answer_preserves_original_target_and_requires_new_approval(self):
         before=self.deploy(port=None)
         self.assertEqual(before['status'],'needs_input')
-        run=self.service.answer(before['id'],{'message':'Use port 8080','port':8080})
+        run=self.service.answer(before['id'],{'message':'Use port 8080','port':8080,'plan_id':'demo-plan'})
         self.assertEqual(run['status'],'awaiting_approval')
         self.assertNotEqual(run['id'],before['id'])
         self.assertEqual(run['parent_id'],before['id'])
@@ -49,7 +49,7 @@ class ProductChecks(unittest.TestCase):
             self.service.answer(before['id'],{'message':'switch target','project':'other-app','port':80})
         ready=self.deploy()
         with self.assertRaises(ValueError):
-            self.service.answer(ready['id'],{'message':'replace an approved plan','port':8080})
+            self.service.answer(ready['id'],{'message':'replace an approved plan','port':8080,'plan_id':'demo-plan'})
         self.assertEqual(self.cloud.mutations,[])
 
     def test_review_explains_impacts_and_does_not_invent_price_or_recovery(self):
@@ -91,9 +91,9 @@ class ProductChecks(unittest.TestCase):
         before=self.deploy(port=None)
         with TestClient(create_app(self.service,access_token='test-access',allowed_hosts={'testserver'})) as client:
             route='/api/runs/'+before['id']+'/answer'
-            self.assertEqual(client.post(route,json={'message':'8080','port':8080}).status_code,401)
+            self.assertEqual(client.post(route,json={'message':'8080','port':8080,'plan_id':'demo-plan'}).status_code,401)
             headers={'Authorization':'Bearer test-access'}
-            response=client.post(route,headers=headers,json={'message':'Use 8080','port':8080})
+            response=client.post(route,headers=headers,json={'message':'Use 8080','port':8080,'plan_id':'demo-plan'})
             self.assertEqual(response.status_code,202)
             child=response.json()
             self.assertEqual(child['parent_id'],before['id'])

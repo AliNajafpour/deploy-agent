@@ -93,7 +93,7 @@ class DemoPlanner:
                     'args': {'platform': context['platform'], 'plan_id': request['plan_id']}})
             steps.append({'action': 'deploy', 'title': 'انتشار نسخهٔ جدید',
                 'reason': 'بستهٔ بازبینی‌شده آپلود و نسخه ساخته و بررسی می‌شود.',
-                'args': {'platform': context['platform'], 'port': context['port']}})
+                'args': {'platform': context['platform'], 'port': context['port'] or (80 if context['platform']=='static' else 3000)}})
             if request.get('domain'):
                 steps.append({'action': 'attach_domain', 'title': 'اتصال دامنه',
                     'reason': 'پس از آماده‌شدن نسخه، دامنهٔ انتخابی اضافه می‌شود.', 'args': {'domain': request['domain']}})

@@ -116,3 +116,25 @@ def snapshot(root, artifact_dir, excluded_roots=(), file_modes=None):
                 'compressed_bytes': destination.stat().st_size}
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def list_sources(workspace, data_dir):
+    root, private = Path(workspace).resolve(), Path(data_dir).resolve()
+    markers = {'package.json', 'liara.json', 'Dockerfile', 'requirements.txt',
+               'pyproject.toml', 'index.html', 'app.py', 'main.py', 'server.mjs', 'server.js'}
+    result = []
+    for directory, dirs, files in os.walk(root, followlinks=False):
+        path = Path(directory)
+        dirs[:] = sorted(name for name in dirs if name not in EXCLUDED_DIRS
+            and not name.startswith('.') and not SENSITIVE.search(name)
+            and not (path/name).is_symlink() and not (path/name).resolve().is_relative_to(private))
+        if len(path.relative_to(root).parts) >= 2:
+            dirs[:] = []
+        if path.resolve().is_relative_to(private):
+            dirs[:] = []
+            continue
+        if markers.intersection(files):
+            result.append({'source': path.relative_to(root).as_posix(), 'label': path.name})
+        if len(result) >= 80:
+            break
+    return result

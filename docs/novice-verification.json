@@ -1,0 +1,30 @@
+{
+  "date": "2026-10-23",
+  "model_provider": "BoxAPI",
+  "configured_model": "openai/gpt-6-luna",
+  "cloud": "simulated local API; no live Liara account used",
+  "execution": "real local processes and HTTP",
+  "cases": [
+    {
+      "fixture": "03-missing-port",
+      "difficulty": "simple",
+      "passed": true,
+      "request_port": null,
+      "agent_chosen_port": 3000,
+      "questions": [],
+      "approval_before_mutation": true,
+      "final_status": "completed",
+      "http_healthy": true
+    },
+    {
+      "fixture": "02-missing-package",
+      "difficulty": "hard",
+      "passed": true,
+      "baseline": "startup failed due to missing dependency",
+      "repair": "model proposed dependency manifest change",
+      "execution": "approved repair built and executed locally; HTTP 200",
+      "original_source_preserved": true
+    }
+  ],
+  "scope": "Only one simple and one hard real-model scenario rerun for this update. Separate targeted regression checks cover security, approval and UI data flow."
+}

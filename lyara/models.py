@@ -27,6 +27,12 @@ class Step(StrictModel):
     args: dict = Field(default_factory=dict)
 
 
+class HostingOption(StrictModel):
+    id: str = Field(min_length=1, max_length=100)
+    title: str = Field(min_length=1, max_length=100)
+    cost: str = Field(min_length=1, max_length=300)
+
+
 class Answer(StrictModel):
     message: str = Field(min_length=1,max_length=3000)
     port: int | None = Field(default=None,ge=1,le=65535)

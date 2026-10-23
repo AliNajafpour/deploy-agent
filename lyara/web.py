@@ -13,6 +13,7 @@ from pydantic import Field
 from .liara import LiaraError
 from .models import Answer, RunRequest, StrictModel
 from .presentation import report_markdown
+from .project import list_sources
 
 
 class Approval(StrictModel):
@@ -69,7 +70,12 @@ def create_app(assistant, access_token='', allowed_hosts=None):
                 'demo': getattr(assistant.planner, 'name', '') == 'offline-demo',
                 'local_lab': bool(getattr(assistant.cloud,'local_lab',False)),
                 'lab_projects': assistant.cloud.catalog() if getattr(assistant.cloud,'local_lab',False) else [],
+                'hosting_options': assistant.hosting_options(),
                 'capabilities': ['repair', 'deploy', 'logs', 'events', 'metrics', 'restart', 'env', 'resize', 'dns', 'ssl']}
+
+    @app.get('/api/sources')
+    def sources():
+        return list_sources(assistant.workspace, assistant.data_dir)
 
     @app.get('/api/projects')
     def projects():

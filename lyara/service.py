@@ -14,7 +14,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, interrupt
 
 from .liara import LiaraError
-from .models import Answer, Plan, RunRequest
+from .models import Answer, HostingOption, Plan, RunRequest
 from .presentation import change_review, operation_report
 from .project import inspect_project, snapshot
 from .security import redact, workspace_path
@@ -75,7 +75,7 @@ def validate_plan(plan, context, artifact, request):
         if set(args) != ARGUMENTS[step.action]:
             raise ValueError('پارامترهای اقدام معتبر نیست: ' + step.action)
         if step.action == 'create_app':
-            if created or deployed or not request['plan_id'] or args['plan_id'] != request['plan_id']:
+            if created or deployed or not request['plan_id'] or args['plan_id'] != request['plan_id'] or args['platform'] != context['platform']:
                 raise ValueError('ایجاد برنامه به پلن صریح و نبود برنامه نیاز دارد.')
             created = True
         elif not created and step.action not in {'create_zone', 'create_record'}:
@@ -165,6 +165,25 @@ class Assistant:
         self.store.save(state['id'], state)
         return state
 
+    def hosting_options(self):
+        if getattr(self.cloud, 'local_lab', False):
+            return [{'id':'local-plan','title':'آزمایش روی همین دستگاه','cost':'بدون هزینهٔ میزبانی ابری'}]
+        if getattr(self.planner, 'name', '') == 'offline-demo':
+            return [{'id':'demo-plan','title':'نمونهٔ نمایشی','cost':'بدون خرید یا تغییر حساب'}]
+        try:
+            raw = os.getenv('LYARA_HOSTING_OPTIONS', '[]')
+            if len(raw) > 20000:
+                raise ValueError()
+            values = json.loads(raw)
+            if not isinstance(values, list) or len(values) > 20:
+                raise ValueError()
+            options = [HostingOption.model_validate(item).model_dump() for item in values]
+            if len({item['id'] for item in options}) != len(options):
+                raise ValueError()
+            return options
+        except (ValueError, TypeError) as error:
+            raise ValueError('گزینه‌های هزینهٔ میزبانی در تنظیمات اتصال معتبر نیستند.') from error
+
     def _prepare(self, state):
         request = state['request']
         observations = self.cloud.observe(request['project'])
@@ -188,21 +207,18 @@ class Assistant:
             project_data = item.get('data', {}).get('project', {})
             platform = platform or project_data.get('type') or inspection['platform']
             port = port or inspection['port']
-            if not platform:
-                questions.append('پلتفرم پروژه را مشخص کنید.')
-            if not port:
-                questions.append('پورت سرویس را مشخص کنید؛ مقدار حدسی استفاده نمی‌شود.')
             if not exists and not request['plan_id']:
-                questions.append('شناسهٔ پلن موردنظر برای ایجاد برنامه لازم است.')
-            if not questions:
-                artifact = snapshot(root, self.data_dir / 'artifacts', excluded_roots=(self.data_dir,))
+                questions.append('برای سایت جدید باید هزینهٔ میزبانی را انتخاب کنی؛ تا انتخاب و تأیید تو هیچ خریدی انجام نمی‌شود.')
+            artifact = snapshot(root, self.data_dir / 'artifacts', excluded_roots=(self.data_dir,))
         elif not exists:
             questions.append('برای این عملیات ابتدا برنامه‌ای موجود را انتخاب کنید.')
         context = {'observations': observations, 'exists': exists, 'inspection': inspection,
                    'platform': platform, 'port': port, 'questions': questions}
-        if request['intent'] == 'repair' and artifact:
+        context['hosting_options'] = self.hosting_options() if request['intent'] in {'deploy','repair','operate'} else []
+        if request['intent'] in {'deploy','repair'} and artifact:
             context['deployment_files'], context['omitted_files'] = deployment_files(artifact, [self.cloud.token])
             context['repair_scope'] = 'Deployment manifests and backend startup only; no UI/business logic. Dependencies install during build, never on the host.'
+            context['setup_policy'] = 'Resolve runtime from these files. When PORT is freely configurable, choose an appropriate value and label it a configuration decision. Never ask the person for ports, frameworks or internal identifiers.'
         active=observations.get('releases',{}).get('data',{}).get('currentRelease')
         context['previous_release']=self.store.known_release(request['project'],active)
         if request.get('health_url') or exists:
@@ -220,6 +236,14 @@ class Assistant:
                         limitations=['مدل داخلی تنظیم نشده؛ ابزار MCP می‌تواند طرح ارائه دهد.'])
         else:
             plan = self.planner.plan(state['request'], state['context'])
+        if not plan.questions:
+            deployment = next((step for step in plan.steps if step.action in {'deploy','repair_deploy'}), None)
+            if deployment:
+                context = dict(state['context'])
+                for field in ['platform','port']:
+                    if not context.get(field):
+                        context[field] = deployment.args.get(field)
+                state = dict(state, context=context)
         validate_plan(plan, state['context'], state['artifact'], state['request'])
         repair = {}
         if not plan.questions:
@@ -244,7 +268,7 @@ class Assistant:
                               'env_fingerprints': env_fingerprints})
         return self._save(state, 'plan', 'طرح و پیامدهای عملیات آماده است.', plan=serialized,
                           plan_digest=fingerprint, env_fingerprints=env_fingerprints, status=status,
-                          artifact=state['artifact'], repair=repair, review=change_review(state['request'],plan,state['context']))
+                          context=state['context'], artifact=state['artifact'], repair=repair, review=change_review(state['request'],plan,state['context']))
 
     def _approve(self, state):
         decision = interrupt({'run_id': state['id'], 'plan_digest': state['plan_digest'], 'plan': state['plan']})
