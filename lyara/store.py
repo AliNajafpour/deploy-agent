@@ -79,6 +79,30 @@ class Store:
                         args=steps[index]['args']
                         return {'sourceID':result['sourceID'],'port':args['port'],'platform':args['platform']}
 
+    def latest_source(self, project, release_id=None):
+        sources, releases = {}, []
+        # ponytail: scan durable history for source provenance; index releases when histories become large.
+        with self.connect() as db:
+            for row in db.execute('SELECT payload FROM runs ORDER BY updated DESC, rowid DESC'):
+                state = json.loads(row[0])
+                request = state.get('request', {})
+                if request.get('project') != project:
+                    continue
+                steps = state.get('plan', {}).get('steps', [])
+                for index, result in enumerate(state.get('results', [])):
+                    if index >= len(steps) or steps[index]['action'] not in {'deploy', 'repair_deploy', 'redeploy'}:
+                        continue
+                    if not result.get('releaseID') or not result.get('sourceID') or result.get('release', {}).get('verified') is not True:
+                        continue
+                    releases.append((result['releaseID'], result['sourceID']))
+                    if steps[index]['action'] != 'redeploy' and request.get('source'):
+                        sources.setdefault(result['sourceID'], request['source'])
+        for deployed_release, source_id in releases:
+            if release_id is None or deployed_release == release_id:
+                if source_id in sources:
+                    return sources[source_id]
+        return '.'
+
     def write_once(self, key, function):
         with self.connect() as db:
             try:

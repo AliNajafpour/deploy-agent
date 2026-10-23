@@ -26,8 +26,8 @@ def create_mcp(assistant):
         return redact(inspect_project(root), [*assistant._secret_values(),*read_source_env(root).values()])
 
     @server.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False))
-    def inspect_deployment_files(source: str = '.') -> dict:
-        """Read bounded, non-secret startup/manifests from a local immutable snapshot; no code execution."""
+    def inspect_deployment_files(source: str = '.', include_backend:bool=False) -> dict:
+        """Read bounded, non-secret manifests or existing backend code; no code execution."""
         from .project import snapshot
         from .repair import deployment_files
         from .inputs import read_source_env
@@ -35,7 +35,7 @@ def create_mcp(assistant):
         secrets=[*assistant._secret_values(),*read_source_env(root).values()]
         artifact = snapshot(root, assistant.data_dir / 'artifacts',
                             excluded_roots=assistant.source_exclusions(source),secrets=secrets,file_modes=assistant.source_modes(source))
-        files, omitted = deployment_files(artifact, secrets)
+        files, omitted = deployment_files(artifact, secrets,include_backend=include_backend)
         return {'files': files, 'omitted': omitted, 'archive_sha256': artifact['sha256']}
 
     @server.tool(annotations=read)

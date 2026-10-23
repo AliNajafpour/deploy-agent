@@ -2,8 +2,7 @@
 
 The requested product covers initial deployment, subsequent releases, environment
 configuration, domain/DNS/TLS setup, monitoring and evidence-based troubleshooting.
-The human explicitly authorized implementation on 2026-10-23 and rejected limiting
-the product to diagnosis. Build inline in this empty, non-Git project directory.
+The application supports deployment and approved repair through one shared service.
 
 ## Shared core
 
@@ -49,25 +48,40 @@ trusted operator configuration, not an arbitrary request path.
 
 ## Interface and demo
 
-Persian RTL operations desk: blue #195dcc, ink #172943, pale blue #eef4fb,
-white #ffffff, red #b42335 and green #126344. System Persian font stack, separate
-monospace data. Main element is a real operation timeline with evidence, plan,
-approval and verification, alongside app selection and a deployment form.
+Persian RTL interface follows Liara's dark graphite, mint and cyan visual direction.
+Vazirmatn is bundled with its license; technical values use monospace.
+ZIP upload and a short request lead to a compact approval and verification view.
+Detailed evidence stays collapsed, and missing credentials are collected in forms.
 Keyboard focus, visible labels, readable errors, mobile layout and reduced motion.
 No JS build dependency. All displayed cloud/model text uses textContent.
 
 An explicitly labeled offline demo uses the production graph with a stateful mock
 HTTP transport and deterministic demonstration planner. The local execution lab
-can instead use actual Codex plans and real fixture processes. The user selected
-local acceptance and excluded live Liara testing from this delivery. Simulated
+can instead use actual provider plans and real fixture processes. Simulated
 cloud tests do not establish live account compatibility. CLI model auth is reused
 only by the selected backend.
 
 ## Evidence and reuse
 
-Reuse the neighboring wallex project's LangGraph/SQLite pattern and its read-only
-structured Codex CLI pattern, without importing financial logic or changing that
-project. Install from its existing wheelhouse into this project's own .venv.
 Official Liara PaaS/DNS OpenAPI snapshots are in docs/reference. Authentication and
 deployment responses are tested with simulated transport; live account compatibility
 is not claimed and live testing is outside the selected scope.
+
+## Backend repair and monitoring
+
+Repairs collect bounded existing backend files, prioritizing traceback paths within
+the archive. Hash checks, path rules, secret checks and syntax-only validation run
+before a new immutable artifact is presented for approval. Uploaded code and package
+hooks never run on the assistant host. Downloadable patches preserve final-newline
+semantics; the original source remains unchanged.
+
+Opt-in watches and incidents persist in operations.sqlite. Two consecutive failed
+public HTTPS probes reserve one incident and one diagnostic run. Missing or blocked
+probes and incomplete telemetry remain unknown. Recovery closes the incident.
+Diagnostics reuse source provenance from verified release history and cannot approve
+mutations. A single-process scheduler shares the Assistant lock with operations;
+this version supports one active instance and up to 25 watches.
+
+The offline doctor checks operator setup before initializing the service. It neither
+contacts providers nor creates state. Successful checks do not prove live API access,
+DNS/TLS, persistent mounts or plan prices.

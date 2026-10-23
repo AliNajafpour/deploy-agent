@@ -1,9 +1,10 @@
-"""Stage bounded deployment repairs. Never run project code or package installers here."""
+"""Stage bounded backend and deployment repairs without running project code."""
 import ast
 import difflib
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import tarfile
@@ -11,7 +12,7 @@ import tempfile
 import tomllib
 from pathlib import Path, PurePosixPath
 
-from .project import snapshot
+from .project import EXCLUDED_DIRS, SENSITIVE, snapshot
 from .security import redact
 
 
@@ -21,23 +22,50 @@ DEPLOYMENT_NAMES = {'liara.json', 'Dockerfile', 'Procfile', 'requirements.txt',
     'server.js', 'server.cjs', 'server.mjs', 'app.js', 'app.cjs', 'app.mjs'}
 MAX_FILE = 24000
 MAX_TOTAL = 60000
+SOURCE_SUFFIXES = {'.py', '.js', '.mjs', '.cjs'}
+NON_BACKEND_DIRS = {'frontend', 'client', 'ui', 'web', 'static', 'public', 'templates',
+    'assets', 'components', 'pages', 'views', 'tests', 'test', 'migrations', 'migration',
+    'alembic', 'dist', 'build'}
 
 
-def allowed_path(name):
-    if not isinstance(name, str) or '\\' in name or ':' in name:
+def allowed_path(name, include_backend=False):
+    if not isinstance(name, str) or '\\' in name or ':' in name or '\x00' in name:
         return False
     path = PurePosixPath(name)
-    return (str(path) == name and not path.is_absolute() and '..' not in path.parts
-            and len(path.parts) in (1, 2) and path.name in DEPLOYMENT_NAMES
-            and (len(path.parts) == 1 or path.parts[0] in {'backend', 'server'}))
+    if str(path) != name or path.is_absolute() or '..' in path.parts:
+        return False
+    if (len(path.parts) in (1, 2) and path.name in DEPLOYMENT_NAMES
+            and (len(path.parts) == 1 or path.parts[0] in {'backend', 'server'})):
+        return True
+    if (not include_backend or path.suffix not in SOURCE_SUFFIXES
+            or any(part.startswith('.') or part.casefold() in NON_BACKEND_DIRS | EXCLUDED_DIRS
+                   or SENSITIVE.search(part) for part in path.parts)
+            or path.name.startswith('test_') or path.stem.endswith(('_test', '.test', '.spec'))
+            or path.name == 'conftest.py'):
+        return False
+    # ponytail: JavaScript needs an explicit backend directory; general src can contain UI.
+    return (path.suffix == '.py' or path.parts[0] in {'backend', 'server', 'api'}
+            or len(path.parts) > 2 and path.parts[0] == 'src' and path.parts[1] in {'backend', 'server', 'api'})
 
 
-def deployment_files(artifact, secrets=()):
+def deployment_files(artifact, secrets=(), include_backend=False, observations=None):
     files, omitted, total = {}, [], 0
     with tarfile.open(artifact['path']) as archive:
-        for member in archive.getmembers():
-            if not allowed_path(member.name) or not member.isfile():
-                continue
+        members = [member for member in archive.getmembers()
+                   if allowed_path(member.name, include_backend) and member.isfile()]
+        if include_backend:
+            evidence = json.dumps(observations, ensure_ascii=False)
+            references = re.findall(r'(?:[A-Za-z]:)?/?(?:[\w.-]+/)*[\w.-]+\.(?:py|mjs|cjs|js)\b',
+                                    evidence.replace('\\\\', '/'))
+            def priority(member):
+                path = PurePosixPath(member.name)
+                if path.name in DEPLOYMENT_NAMES and path.suffix not in SOURCE_SUFFIXES:
+                    return 0, member.name
+                if any(ref == member.name or ref.endswith('/' + member.name) for ref in references):
+                    return 1, member.name
+                return (2 if allowed_path(member.name) else 3), member.name
+            members.sort(key=priority)
+        for member in members:
             if member.size > MAX_FILE or total + member.size > MAX_TOTAL:
                 omitted.append(member.name)
                 continue
@@ -63,7 +91,9 @@ def validate_edits(edits, files):
         if not isinstance(edit, dict) or set(edit) != {'path', 'before_sha256', 'content'}:
             raise ValueError('هر فایل اصلاحی به path، before_sha256 و content نیاز دارد.')
         name, content = edit['path'], edit['content']
-        if not allowed_path(name) or name.casefold() in names:
+        if (not isinstance(name, str)
+                or not allowed_path(name) and not (name in files and allowed_path(name, include_backend=True))
+                or name.casefold() in names):
             raise ValueError('مسیر فایل اصلاحی خارج از محدودهٔ انتشار یا تکراری است.')
         if PurePosixPath(name).name == 'package-lock.json':
             raise ValueError('اصلاح خودکار lockfile پشتیبانی نمی‌شود؛ آن را با ابزار مدیریت پکیج بازتولید کنید.')
@@ -145,8 +175,9 @@ def stage_repair(artifact, edits, files, artifact_dir, secrets=()):
             if actual != edit['before_sha256']:
                 raise ValueError('فایل پنهان یا بررسی‌نشده قابل بازنویسی نیست: ' + name)
             old = files.get(name, {}).get('content', '')
-            diff.extend(difflib.unified_diff(old.splitlines(keepends=True), content.splitlines(keepends=True),
-                        fromfile='before/' + name, tofile='after/' + name))
+            for line in difflib.unified_diff(old.splitlines(keepends=True), content.splitlines(keepends=True),
+                        fromfile='before/' + name, tofile='after/' + name):
+                diff.append(line if line.endswith('\n') else line + '\n\\ No newline at end of file\n')
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(content.encode('utf8'))
             changes.append({'path': name, 'before_sha256': actual,
@@ -183,4 +214,4 @@ def stage_repair(artifact, edits, files, artifact_dir, secrets=()):
         'checks': checks, 'dependency_note': 'Dependencies are installed by the deployment build from the approved manifest. No host installation occurs.',
         'limits': ['Structural checks do not prove runtime health.',
                    'Repairs affect the staged deployment only; original workspace files are preserved.',
-                   'Backend entrypoints and deployment files only; no UI or product feature changes.']}
+                   'Existing bounded backend source and deployment files only; no UI, unrelated features, migrations or authentication weakening.']}

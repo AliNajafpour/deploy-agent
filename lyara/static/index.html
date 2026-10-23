@@ -15,7 +15,7 @@
     <div class="workspace-top"><select id="history" aria-label="درخواست‌های قبلی" hidden></select></div>
     <div id="composer">
       <div class="desk-heading"><h1 id="workspace-title">سایتت را آنلاین کن.</h1></div>
-      <div class="mode-switch" role="group" aria-label="نوع درخواست"><button data-mode="deploy" class="selected" aria-pressed="true">انتشار سایت</button><button data-mode="diagnose" aria-pressed="false">بررسی مشکل</button><details class="more-actions"><summary>بیشتر</summary><div class="extra-actions"><button data-mode="repair" aria-pressed="false">اصلاح انتشار</button><button data-mode="operate" aria-pressed="false">تغییر سایت</button><button data-mode="monitor" aria-pressed="false">بررسی وضعیت</button></div></details></div>
+      <div class="mode-switch" role="group" aria-label="نوع درخواست"><button data-mode="deploy" class="selected" aria-pressed="true">انتشار سایت</button><button data-mode="diagnose" aria-pressed="false">بررسی مشکل</button><details class="more-actions"><summary>بیشتر</summary><div class="extra-actions"><button data-mode="repair" aria-pressed="false">اصلاح مشکل سایت</button><button data-mode="operate" aria-pressed="false">تغییر سایت</button><button data-mode="monitor" aria-pressed="false">بررسی وضعیت</button></div></details></div>
       <form id="request-form" class="request-form">
         <input id="project" type="hidden"><input id="source" type="hidden"><input id="plan" type="hidden"><input id="port" type="hidden"><input id="platform" type="hidden"><input id="health" type="hidden">
         <label class="upload-label"><svg class="upload-icon" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 28H9a6 6 0 0 1-.8-12 12 12 0 0 1 23.1-1.4A7 7 0 0 1 32 28h-4M20 34V19m-6 6 6-6 6 6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="upload-action">انتخاب فایل ZIP</span><input id="site-upload" type="file" accept=".zip,application/zip" aria-label="فایل‌های سایت" aria-describedby="upload-status"><span id="upload-status" class="upload-status" role="status">فایل ZIP سایتت را انتخاب کن.</span></label>
@@ -37,11 +37,16 @@
           <button class="primary" id="send-answer" type="submit">ادامهٔ بررسی <span aria-hidden="true">←</span></button>
         </form>
         <div id="verification"></div>
+        <div class="next-actions"><button class="quiet" id="repair" hidden>بررسی و رفع مشکل</button></div>
         <details id="technical-details" class="technical-details"><summary id="details-label">جزئیات بررسی</summary>
-          <div class="run-tools"><button class="quiet" id="download-report">دریافت گزارش</button><button class="quiet" id="resume" hidden>ادامهٔ کار متوقف‌شده</button><button class="quiet" id="recheck" hidden>بررسی دوباره</button><button class="quiet" id="repair" hidden>اصلاح انتشار</button><button class="quiet" id="recovery" hidden>برگرداندن نسخهٔ قبلی</button></div>
+          <div class="run-tools"><button class="quiet" id="download-report">دریافت گزارش</button><button class="quiet" id="download-patch" hidden>دریافت اصلاحیهٔ کد</button><button class="quiet" id="resume" hidden>ادامهٔ کار متوقف‌شده</button><button class="quiet" id="recheck" hidden>بررسی دوباره</button><button class="quiet" id="recovery" hidden>برگرداندن نسخهٔ قبلی</button></div>
           <div id="limitations"></div><p id="planner-summary"></p><p id="run-parent" class="muted"></p><code id="approval-digest" dir="ltr"></code><pre id="setup-info" class="step-args"></pre><div id="steps"></div><div id="artifact"></div><div id="repair-preview"></div><div id="evidence"></div><details class="event-details"><summary>رویدادها</summary><ol id="events" class="events"></ol></details>
         </details>
       </div>
+    </section>
+    <section id="monitoring" class="monitor-panel" aria-label="پایش سایت" hidden>
+      <div class="monitor-heading"><h2>مراقبت از سایت</h2><button id="watch-toggle" class="quiet" type="button" aria-pressed="false">فعال‌کردن پایش</button></div>
+      <p id="watch-status" class="muted" role="status"></p><div id="incidents"></div>
     </section>
   </main>
   <dialog id="access-dialog"><form method="dialog"><div class="dialog-heading"><h2>اتصال به برنامه</h2><button class="text-button" aria-label="بستن">×</button></div><label>کد ورود<input id="access-token" type="password" autocomplete="current-password" dir="ltr"></label><button id="save-access" class="primary" value="save">ورود</button><details class="connection-details"><summary>اطلاعات اتصال</summary><pre id="configuration" dir="ltr"></pre><button type="button" id="refresh" class="quiet">تازه‌سازی سایت‌ها</button></details></form></dialog>

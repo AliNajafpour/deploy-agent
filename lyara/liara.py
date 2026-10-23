@@ -157,16 +157,19 @@ class LiaraClient:
         return self._request('POST', '/api/v1/zones/' + segment(zone) + '/dns-records', dns=True, json=record)
 
     def health(self, url):
+        attempted = False
         try:
             destination = public_https(url)
             pinned = httpx.URL(url).copy_with(host=destination['ip'])
             # Never reuse the authenticated cloud client for website requests.
             with httpx.Client(timeout=10, follow_redirects=False, trust_env=False) as client:
                 started = time.monotonic()
+                attempted = True
                 with client.stream('GET', pinned, headers={'Host': httpx.URL(url).host},
                                    extensions={'sni_hostname': httpx.URL(url).host}) as response:
-                    return {'available': True, 'url': url, 'status': response.status_code,
+                    return {'available': True, 'probe_attempted': True, 'url': url, 'status': response.status_code,
                             'healthy': 200 <= response.status_code < 400,
                             'latency_ms': round((time.monotonic() - started) * 1000)}
         except (OSError, ValueError, httpx.HTTPError):
-            return {'available': False, 'url': url, 'healthy': False, 'error': 'بررسی HTTPS موفق نبود یا مقصد مجاز نیست.'}
+            return {'available': False, 'probe_attempted': attempted, 'url': url, 'healthy': False,
+                    'error': 'اتصال HTTPS به سایت موفق نبود.' if attempted else 'مقصد HTTPS قابل بررسی یا مجاز نیست.'}

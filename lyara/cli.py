@@ -22,6 +22,9 @@ def main():
     serve = commands.add_parser('serve')
     serve.add_argument('--host', default='127.0.0.1')
     serve.add_argument('--port', default=8787, type=int)
+    doctor = commands.add_parser('doctor', help='Check local or production setup without calling cloud/model APIs')
+    doctor.add_argument('--json', action='store_true')
+    doctor.add_argument('--production', action='store_true')
     commands.add_parser('mcp')
     commands.add_parser('projects')
     commands.add_parser('runs')
@@ -56,6 +59,16 @@ def main():
             sub.add_argument('--interval', default=60, type=int)
             sub.add_argument('--once', action='store_true')
     args = parser.parse_args()
+    if args.command == 'doctor':
+        from .readiness import check_readiness
+        result = check_readiness(production=args.production)
+        if args.json:
+            emit(result)
+        else:
+            for check in result['checks']:
+                print(f"[{check['status']}] {check['label']}: {check['detail']}")
+            print('آماده است.' if result['ready'] else 'موارد خطادار را پیش از استقرار برطرف کنید.')
+        raise SystemExit(0 if result['ready'] else 1)
     service = None
     try:
         service = create_assistant(args.demo, model=args.command not in {'mcp', 'projects', 'status', 'runs', 'approve', 'monitor','report','recheck','recovery'})
@@ -67,7 +80,7 @@ def main():
                 raise ValueError('برای دسترسی غیرمحلی LYARA_ACCESS_TOKEN را تنظیم کنید.')
             hosts = {'127.0.0.1', 'localhost', '::1'}
             if os.getenv('LYARA_PUBLIC_HOST'):
-                hosts.add(os.environ['LYARA_PUBLIC_HOST'])
+                hosts.add(os.environ['LYARA_PUBLIC_HOST'].encode('idna').decode('ascii').lower())
             uvicorn.run(create_app(service, token, hosts), host=args.host, port=args.port)
         elif args.command == 'mcp':
             from .mcp_server import create_mcp

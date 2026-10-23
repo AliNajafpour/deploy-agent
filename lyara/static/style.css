@@ -149,3 +149,7 @@ dialog .primary{width:100%;margin-top:21px}
  .approval{padding:20px 20px 0}.operation-body{padding:22px 20px}.plan-review{font-size:14px}.answer-form .primary{width:100%}.run-tools .quiet{flex:1 1 130px}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;scroll-behavior:auto!important}}
+
+.monitor-panel{margin-top:24px;border:1px solid var(--line);border-radius:14px;background:var(--paper);padding:22px 24px}.monitor-heading{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:12px}.monitor-heading h2{font-size:17px}.monitor-panel .muted{font-size:13px;line-height:2}.incident{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--line);margin-top:15px;padding-top:10px;font-size:13px}.incident .text-button{color:var(--blue);font-size:12px;white-space:normal;text-align:start}@media(max-width:560px){.monitor-panel{padding:19px}.incident{align-items:start;flex-direction:column}.incident .text-button{padding-inline:0}}
+
+.next-actions:has(button:not([hidden])){margin-top:18px}.next-actions .quiet{border-color:#84fbc655;color:var(--blue)}

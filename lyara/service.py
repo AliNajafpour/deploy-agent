@@ -268,8 +268,8 @@ class Assistant:
                    'env_refs':env_refs,'configuration_candidates':candidates}
         context['hosting_options'] = self.hosting_options() if request['intent'] in {'deploy','repair','operate'} else []
         if request['intent'] in {'deploy','repair'} and artifact:
-            context['deployment_files'], context['omitted_files'] = deployment_files(artifact, self._secret_values(request['project']))
-            context['repair_scope'] = 'Deployment manifests and backend startup only; no UI/business logic. Dependencies install during build, never on the host.'
+            context['deployment_files'], context['omitted_files'] = deployment_files(artifact, self._secret_values(request['project']),include_backend=request['intent']=='repair',observations=observations)
+            context['repair_scope'] = 'Repair existing backend defects evidenced by logs/source, or deployment blockers. No unrelated features, frontend changes, schema migrations or weakened authentication. Dependencies install during build, never on this host.'
             context['setup_policy'] = 'Resolve runtime from these files. When PORT is freely configurable, choose an appropriate value and label it a configuration decision. Never ask the person for ports, frameworks or internal identifiers.'
         active=observations.get('releases',{}).get('data',{}).get('currentRelease')
         context['previous_release']=self.store.known_release(request['project'],active)
@@ -319,7 +319,7 @@ class Assistant:
             step = next((step for step in plan.steps if step.action == 'repair_deploy'), None)
             if step:
                 artifact, repair = stage_repair(state['artifact'], step.args['files'],
-                    state['context']['deployment_files'], self.data_dir / 'artifacts', [self.cloud.token])
+                    state['context']['deployment_files'], self.data_dir / 'artifacts', self._secret_values(state['request']['project']))
                 state = dict(state, artifact=artifact)
         if plan.questions or plan.inputs:
             status = 'needs_input'
@@ -616,7 +616,7 @@ class Assistant:
         if previous['status'] not in {'failed', 'needs_attention', 'observed', 'completed'}:
             raise ValueError('ابتدا نتیجهٔ بررسی یا انتشار فعلی را دریافت کنید.')
         request = dict(previous['request'], intent='repair')
-        request['message'] = ('فقط مانع انتشار یا اجرای بک‌اند را اصلاح کن؛ قابلیت سایت را تغییر نده.\n'
+        request['message'] = ('باگ موجود بک‌اند یا مانع انتشار را بر اساس شواهد اصلاح کن؛ قابلیت تازه، تغییر رابط و تغییر ساختار داده نده.\n'
             + previous['request']['message'] + '\nخطای بررسی قبلی: ' + str(previous.get('error', '')))[-6000:]
         state = self.new(RunRequest.model_validate(request))
         return self._save(state, 'repair', 'بررسی اصلاح انتشار شروع شد؛ تغییرات فایل پیش از انتشار به تأیید تازه نیاز دارد.', parent_id=run_id)

@@ -6,10 +6,11 @@ from urllib.parse import urlsplit
 
 
 SECRET_KEY = re.compile(r'(password|secret|token|authorization|api.?key|credential|private.?key)', re.I)
+# Scan each identifier or scheme once, without backtracking across parsed keys or whitespace.
 SECRET_TEXT = re.compile(
     r'(?i)(bearer\s+)[^\s,;"\']+|'
-    r'((?:[A-Za-z0-9_]*(?:password|passwd|secret|token|api[_-]?key|credential|private[_-]?key)[A-Za-z0-9_]*)\s*["\']?\s*\]?\s*[=:]\s*["\']?)[^\s,;"\']+|'
-    r'([a-z][a-z0-9+.-]*://[^\s/:]+:)[^\s@]+(?=@)|'
+    r'(?<![A-Za-z0-9_])((?>[A-Za-z0-9_]*(?:password|passwd|secret|token|api[_-]?key|credential|private[_-]?key)[A-Za-z0-9_]*)\s*+["\']?\s*+\]?\s*+[=:]\s*+["\']?)[^\s,;"\']+|'
+    r'(?<![a-z0-9+.-])([a-z0-9+.-]+://[^\s/:]+:)[^\s@]+(?=@)|'
     r'\b(?:sk-|sk-ant-)[A-Za-z0-9_-]{8,}'
 )
 

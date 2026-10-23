@@ -16,6 +16,7 @@ from .liara import LiaraError
 from .models import Answer, InputValues, RunRequest, StrictModel
 from .presentation import report_markdown
 from .uploads import MAX_UPLOAD, import_zip, list_uploads
+from .monitoring import Monitoring
 
 
 class Approval(StrictModel):
@@ -23,16 +24,28 @@ class Approval(StrictModel):
     plan_digest: str = Field(min_length=64, max_length=64)
 
 
+class WatchSettings(StrictModel):
+    enabled: bool
+    interval: int = Field(default=60,ge=60,le=86400)
+    health_url: str = Field(default='',max_length=1000)
+
+
 def create_app(assistant, access_token='', allowed_hosts=None):
     allowed_hosts = allowed_hosts or {'127.0.0.1', 'localhost', '::1'}
     executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='lyara')
+    monitoring = Monitoring(assistant)
 
     @asynccontextmanager
     async def lifespan(app):
-        yield
-        executor.shutdown(wait=True)
+        monitoring.start()
+        try:
+            yield
+        finally:
+            monitoring.close()
+            executor.shutdown(wait=True)
 
     app = FastAPI(title='Lyara', docs_url=None, redoc_url=None, lifespan=lifespan)
+    app.state.monitoring=monitoring
     static = Path(__file__).parent / 'static'
 
     @app.middleware('http')
@@ -77,7 +90,7 @@ def create_app(assistant, access_token='', allowed_hosts=None):
                 'hosting_connected': bool(getattr(assistant.cloud,'connected',True)),
                 'upload_max_bytes': MAX_UPLOAD,
                 'hosting_options': assistant.hosting_options(),
-                'capabilities': ['repair', 'deploy', 'logs', 'events', 'metrics', 'restart', 'env', 'resize', 'dns', 'ssl']}
+                'capabilities': ['repair', 'backend-repair', 'monitoring', 'deploy', 'logs', 'events', 'metrics', 'restart', 'env', 'resize', 'dns', 'ssl']}
 
     @app.get('/api/sources')
     def sources():
@@ -109,6 +122,24 @@ def create_app(assistant, access_token='', allowed_hosts=None):
     def evidence(name: str):
         RunRequest(message='observe', project=name)
         return assistant.observe(name)
+
+    @app.get('/api/monitoring')
+    def watches():
+        return monitoring.list()
+
+    @app.put('/api/monitoring/{name}')
+    def configure_watch(name:str,settings:WatchSettings):
+        RunRequest(message='monitor',project=name)
+        if settings.enabled:
+            if not getattr(assistant.cloud,'connected',True):
+                raise ValueError('برای پایش، اتصال حساب میزبانی لازم است.')
+            assistant.cloud.project(name)
+        return monitoring.configure(name,**settings.model_dump())
+
+    @app.get('/api/incidents')
+    def incidents(project:str|None=None):
+        if project is not None:RunRequest(message='monitor',project=project)
+        return monitoring.incidents(project)
 
     @app.get('/api/runs')
     def runs():
@@ -161,6 +192,13 @@ def create_app(assistant, access_token='', allowed_hosts=None):
             return PlainTextResponse(report_markdown(result),media_type='text/markdown',
                 headers={'Content-Disposition':'attachment; filename="lyara-report-'+result['id']+'.md"'})
         return result
+
+    @app.get('/api/runs/{run_id}/patch')
+    def patch(run_id:str):
+        state=assistant.get(run_id)
+        diff=state.get('repair',{}).get('diff')
+        if not diff:raise HTTPException(404,'اصلاحیه‌ای برای این بررسی ثبت نشده است.')
+        return PlainTextResponse(diff,media_type='text/x-diff',headers={'Content-Disposition':'attachment; filename="site-fix.patch"'})
 
     @app.post('/api/runs/{run_id}/approval', status_code=202)
     def approve(run_id: str, decision: Approval):
