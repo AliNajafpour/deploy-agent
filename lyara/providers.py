@@ -206,9 +206,9 @@ class CLIPlanner:
 
 def provider_from_env(environ=None):
     env = os.environ if environ is None else environ
-    name = env.get('LYARA_PROVIDER', 'codex').lower()
+    name = env.get('LYARA_PROVIDER', 'api').lower()
     if name in {'codex', 'claude'}:
         return CLIPlanner(name, env.get('LYARA_MODEL', ''))
     if name == 'api':
-        return APIPlanner(env.get('LYARA_LLM_API_KEY', ''), env.get('LYARA_LLM_BASE_URL', 'https://api.openai.com/v1'), env.get('LYARA_MODEL', ''))
+        return APIPlanner(env.get('LYARA_LLM_API_KEY', ''), env.get('LYARA_LLM_BASE_URL') or 'https://ai.boxapi.ir/ai/v1', env.get('LYARA_MODEL') or 'openai/gpt-6-luna')
     raise ValueError('LYARA_PROVIDER باید api، codex یا claude باشد.')

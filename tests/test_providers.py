@@ -10,6 +10,16 @@ from lyara.providers import APIPlanner, invoke_cli, parse_plan, provider_from_en
 
 
 class ProviderChecks(unittest.TestCase):
+    def test_default_api_is_boxapi_luna_and_explicit_overrides_still_work(self):
+        planner = provider_from_env({'LYARA_LLM_API_KEY': 'test-key-value'})
+        self.assertIsInstance(planner, APIPlanner)
+        self.assertEqual(planner.base_url, 'https://ai.boxapi.ir/ai/v1')
+        self.assertEqual(planner.model, 'openai/gpt-6-luna')
+        custom = provider_from_env({'LYARA_PROVIDER': 'api', 'LYARA_LLM_API_KEY': 'test-key-value',
+            'LYARA_LLM_BASE_URL': 'https://example.com/v1', 'LYARA_MODEL': 'chosen-model'})
+        self.assertEqual((custom.base_url, custom.model), ('https://example.com/v1', 'chosen-model'))
+        self.assertEqual(provider_from_env({'LYARA_PROVIDER': 'codex'}).model, '')
+
     def test_cli_missing_login_gives_actionable_error(self):
         with tempfile.TemporaryDirectory() as tmp:
             command = [sys.executable, '-c', 'import json,sys; print(json.dumps({"is_error":True,"result":"Not logged in - Please run /login"})); sys.exit(1)']
