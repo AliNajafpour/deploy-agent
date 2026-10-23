@@ -122,8 +122,7 @@ class NoviceChecks(unittest.TestCase):
                 r=client.get('/api/sources',headers={'Authorization':'Bearer access'})
                 self.assertEqual(r.status_code,200)
                 names={item['source'] for item in r.json()}
-                self.assertIn('site-one',names)
-                self.assertTrue(names.isdisjoint({'.lyara','node_modules','private-state'}))
+                self.assertEqual(names,set())
         finally:
             other.close()
 

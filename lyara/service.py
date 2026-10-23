@@ -20,6 +20,7 @@ from .project import inspect_project, snapshot
 from .security import redact, workspace_path
 from .repair import deployment_files, stage_repair, validate_edits
 from .store import Store, now
+from .uploads import upload_root, upload_id, upload_modes
 from .inputs import InputVault, allowed_name, discover_inputs, input_label, read_source_env
 
 
@@ -168,6 +169,15 @@ class Assistant:
         self.store.save(state['id'], state)
         return state
 
+    def source_path(self,source):
+        return upload_root(self.data_dir,source) if source.startswith('upload:') else workspace_path(self.workspace,source)
+
+    def source_exclusions(self,source):
+        return () if source.startswith('upload:') else (self.data_dir,)
+
+    def source_modes(self,source):
+        return upload_modes(self.data_dir,source) if source.startswith('upload:') else None
+
     def _secret_values(self,project=None):
         return [self.cloud.token,getattr(self.planner,'key',''),*self.vault.secrets(project),*(self.observed_values.get(project,[]) if project is not None else [value for values in self.observed_values.values() for value in values])]
 
@@ -214,12 +224,15 @@ class Assistant:
         item = observations['project']
         exists = item['available']
         questions, inspection, artifact = [], {}, {}
+        connected=getattr(self.cloud,'connected',True)
         missing_inputs, available_inputs, env_refs, candidates = [], [], {}, []
-        if not exists and item.get('status') != 404:
+        if not connected:
+            questions.append('برای انتشار، اتصال حساب میزبانی لازم است.')
+        elif not exists and item.get('status') != 404:
             questions.append('اطلاعات برنامه قابل دریافت نیست؛ ابتدا دسترسی یا ارتباط لیارا را اصلاح کنید.')
         platform, port = request.get('platform'), request.get('port')
         if request['intent'] in {'deploy', 'repair'}:
-            root = workspace_path(self.workspace, request['source'])
+            root = self.source_path(request['source'])
             try:
                 inspection = inspect_project(root)
             except ValueError:
@@ -230,22 +243,26 @@ class Assistant:
             project_data = item.get('data', {}).get('project', {})
             platform = platform or project_data.get('type') or inspection['platform']
             port = port or inspection['port']
-            if not exists and not request['plan_id']:
+            if connected and not exists and not request['plan_id']:
                 questions.append('برای سایت جدید باید هزینهٔ میزبانی را انتخاب کنی؛ تا انتخاب و تأیید تو هیچ خریدی انجام نمی‌شود.')
             source_values = read_source_env(root)
+            if request['source'].startswith('upload:'):
+                uploaded=self.vault.values('upload-'+upload_id(request['source']))
+                source_values={**{name:item['value'] for name,item in uploaded.items()},**source_values}
             if source_values:
                 self.vault.put(request['project'],source_values,'env-file')
             saved = self.vault.values(request['project'])
-            declared,candidates = discover_inputs(root,self._secret_values(request['project']),excluded_roots=(self.data_dir,))
+            declared,candidates = discover_inputs(root,self._secret_values(request['project']),excluded_roots=self.source_exclusions(request['source']))
             host_names = set(item.get('configured_env',[]))
             available_inputs = [{'name':name,'source':item['source']} for name,item in saved.items()]
             available_inputs += [{'name':name,'source':'host'} for name in sorted(host_names-set(saved))]
             missing_inputs = [input_label(name) for name in declared if name not in saved and name not in host_names]
             env_refs = {name:self.vault.reference(request['project'],name) for name in saved}
-            artifact = snapshot(root, self.data_dir / 'artifacts', excluded_roots=(self.data_dir,),secrets=self._secret_values(request['project']))
+            artifact = snapshot(root, self.data_dir / 'artifacts', excluded_roots=self.source_exclusions(request['source']),secrets=self._secret_values(request['project']),file_modes=self.source_modes(request['source']))
         elif not exists:
             questions.append('برای این عملیات ابتدا برنامه‌ای موجود را انتخاب کنید.')
         context = {'observations': observations, 'exists': exists, 'inspection': inspection,
+                   'connection_required':not connected,
                    'platform': platform, 'port': port, 'questions': questions,
                    'input_requests':missing_inputs,'available_inputs':available_inputs,
                    'env_refs':env_refs,'configuration_candidates':candidates}

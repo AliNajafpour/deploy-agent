@@ -20,10 +20,11 @@ def segment(value):
 
 class LiaraClient:
     def __init__(self, token, team_id='', transport=None):
-        if not token or any(c in token for c in '\r\n'):
-            raise ValueError('LIARA_API_TOKEN تنظیم نشده یا نامعتبر است.')
+        if any(c in token for c in '\r\n'):
+            raise ValueError('LIARA_API_TOKEN نامعتبر است.')
         self.token, self.team_id = token, team_id
-        self.http = httpx.Client(headers={'Authorization': 'Bearer ' + token},
+        self.connected=bool(token)
+        self.http = httpx.Client(headers={'Authorization': 'Bearer ' + token} if token else {},
                                  timeout=45, follow_redirects=False, transport=transport, trust_env=False)
 
     def __enter__(self):
@@ -33,6 +34,7 @@ class LiaraClient:
         self.http.close()
 
     def _request(self, method, path, *, dns=False, params=None, **kwargs):
+        if not self.connected:raise LiaraError(503,'برای انتشار، اتصال حساب میزبانی لازم است.')
         query = dict(params or {})
         if self.team_id:
             query['teamID'] = self.team_id
@@ -57,6 +59,7 @@ class LiaraClient:
             raise LiaraError(502, 'پاسخ لیارا JSON معتبر نیست.', uncertain=method != 'GET') from error
 
     def projects(self):
+        if not self.connected:return {'projects':[]}
         return redact(self._request('GET', '/v1/projects'), [self.token])
 
     def project(self, name, raw=False):

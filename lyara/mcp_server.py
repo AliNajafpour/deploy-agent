@@ -4,7 +4,7 @@ from mcp.types import ToolAnnotations
 
 from .models import Plan, RunRequest
 from .project import inspect_project
-from .security import redact, workspace_path
+from .security import redact
 
 
 def create_mcp(assistant):
@@ -21,7 +21,9 @@ def create_mcp(assistant):
     @server.tool(annotations=read)
     def inspect_source(source: str = '.') -> dict:
         """Read project manifests, detected platform/port and required environment names."""
-        return redact(inspect_project(workspace_path(assistant.workspace, source)), [assistant.cloud.token])
+        from .inputs import read_source_env
+        root=assistant.source_path(source)
+        return redact(inspect_project(root), [*assistant._secret_values(),*read_source_env(root).values()])
 
     @server.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False))
     def inspect_deployment_files(source: str = '.') -> dict:
@@ -29,10 +31,10 @@ def create_mcp(assistant):
         from .project import snapshot
         from .repair import deployment_files
         from .inputs import read_source_env
-        root=workspace_path(assistant.workspace,source)
+        root=assistant.source_path(source)
         secrets=[*assistant._secret_values(),*read_source_env(root).values()]
         artifact = snapshot(root, assistant.data_dir / 'artifacts',
-                            excluded_roots=(assistant.data_dir,),secrets=secrets)
+                            excluded_roots=assistant.source_exclusions(source),secrets=secrets,file_modes=assistant.source_modes(source))
         files, omitted = deployment_files(artifact, secrets)
         return {'files': files, 'omitted': omitted, 'archive_sha256': artifact['sha256']}
 

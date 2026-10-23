@@ -8,7 +8,7 @@
   <header class="topbar">
     <a class="brand" href="/" aria-label="لیارا، صفحهٔ اصلی"><span class="brand-mark">لـ</span>لیارا</a>
     <nav class="site-nav" aria-label="انتخاب سایت"><select id="projects" aria-label="سایت‌های من"><option value="">سایت جدید</option></select><button id="new-project" class="text-button">+ جدید</button></nav>
-    <span id="environment" class="environment" hidden></span>
+    <span id="hosting-status" class="environment" hidden></span>
     <button class="text-button access-button" id="access-button" aria-label="ورود و اطلاعات اتصال"><span id="connection">اتصال…</span><span aria-hidden="true">⌁</span></button>
   </header>
   <main class="workspace">
@@ -18,8 +18,7 @@
       <div class="mode-switch" role="group" aria-label="نوع درخواست"><button data-mode="deploy" class="selected" aria-pressed="true">انتشار سایت</button><button data-mode="diagnose" aria-pressed="false">بررسی مشکل</button><details class="more-actions"><summary>بیشتر</summary><div class="extra-actions"><button data-mode="repair" aria-pressed="false">اصلاح انتشار</button><button data-mode="operate" aria-pressed="false">تغییر سایت</button><button data-mode="monitor" aria-pressed="false">بررسی وضعیت</button></div></details></div>
       <form id="request-form" class="request-form">
         <input id="project" type="hidden"><input id="source" type="hidden"><input id="plan" type="hidden"><input id="port" type="hidden"><input id="platform" type="hidden"><input id="health" type="hidden">
-        <label id="lab-catalog" hidden>سایت آزمایشی<select id="lab-project"></select></label>
-        <div id="source-choice-box"><label>پوشهٔ سایت<select id="source-picker"><option value="">پوشه را انتخاب کن</option></select></label><details id="manual-source" class="optional-question"><summary>واردکردن مسیر پوشه</summary><label>مسیر پوشه<input id="source-manual" dir="ltr" autocomplete="off" placeholder="my-site"></label></details></div>
+        <label class="upload-label"><span class="upload-action">انتخاب فایل ZIP <span aria-hidden="true">↑</span></span><input id="site-upload" type="file" accept=".zip,application/zip" aria-label="فایل‌های سایت" aria-describedby="upload-status"><span id="upload-status" class="upload-status" role="status">فایل ZIP سایتت را انتخاب کن.</span></label>
         <label class="message-label">چه کاری انجام بدهم؟<textarea id="message" rows="2" required maxlength="6000" placeholder="سایتم را منتشر کن…"></textarea></label>
         <details class="optional-question"><summary>اتصال آدرس دلخواه</summary><label>آدرسی که قبلاً خریده‌ای<input id="domain" placeholder="example.com" dir="ltr" autocomplete="off"></label></details>
         <div class="form-footer"><button class="primary" id="submit" type="submit">بررسی درخواست <span aria-hidden="true">←</span></button></div>

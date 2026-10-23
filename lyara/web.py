@@ -1,5 +1,6 @@
 import hmac
 import os
+import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -14,7 +15,7 @@ from pydantic import Field
 from .liara import LiaraError
 from .models import Answer, InputValues, RunRequest, StrictModel
 from .presentation import report_markdown
-from .project import list_sources
+from .uploads import MAX_UPLOAD, import_zip, list_uploads
 
 
 class Approval(StrictModel):
@@ -73,15 +74,32 @@ def create_app(assistant, access_token='', allowed_hosts=None):
     def config():
         return {'provider': getattr(assistant.planner, 'name', 'external-mcp'),
                 'model': getattr(assistant.planner, 'model', ''), 'workspace': str(assistant.workspace),
-                'demo': getattr(assistant.planner, 'name', '') == 'offline-demo',
-                'local_lab': bool(getattr(assistant.cloud,'local_lab',False)),
-                'lab_projects': assistant.cloud.catalog() if getattr(assistant.cloud,'local_lab',False) else [],
+                'hosting_connected': bool(getattr(assistant.cloud,'connected',True)),
+                'upload_max_bytes': MAX_UPLOAD,
                 'hosting_options': assistant.hosting_options(),
                 'capabilities': ['repair', 'deploy', 'logs', 'events', 'metrics', 'restart', 'env', 'resize', 'dns', 'ssl']}
 
     @app.get('/api/sources')
     def sources():
-        return list_sources(assistant.workspace, assistant.data_dir)
+        return list_uploads(assistant.data_dir)
+
+    @app.post('/api/uploads',status_code=201)
+    async def upload(request:Request):
+        if request.headers.get('content-type','').split(';')[0] not in {'application/zip','application/octet-stream'}:
+            raise HTTPException(415,'یک فایل ZIP انتخاب کن.')
+        length=request.headers.get('content-length')
+        if length and (not length.isdigit() or int(length)>MAX_UPLOAD):
+            raise HTTPException(413,'حجم ZIP باید کمتر از ۵۰ مگابایت باشد.')
+        with tempfile.TemporaryFile() as archive:
+            size=0
+            async for chunk in request.stream():
+                size+=len(chunk)
+                if size>MAX_UPLOAD:raise HTTPException(413,'حجم ZIP باید کمتر از ۵۰ مگابایت باشد.')
+                archive.write(chunk)
+            archive.seek(0)
+            # ZIP parsing and extraction are blocking; no project code is executed.
+            from starlette.concurrency import run_in_threadpool
+            return await run_in_threadpool(import_zip,archive,request.headers.get('x-file-name',''),assistant.data_dir,assistant.vault)
 
     @app.get('/api/projects')
     def projects():

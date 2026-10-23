@@ -41,14 +41,14 @@ class LocalProjectChecks(unittest.TestCase):
             return self.service.approve(before['id'], before['plan_digest'], approved)
         return before
 
-    def test_web_identifies_local_lab_instead_of_live_cloud(self):
+    def test_web_does_not_expose_lab_catalog(self):
         from fastapi.testclient import TestClient
         from lyara.web import create_app
         self.cloud.register('fixture-app','02-node')
         with TestClient(create_app(self.service,allowed_hosts={'testserver'})) as web:
             config=web.get('/api/config').json()
-        self.assertTrue(config['local_lab'])
-        self.assertEqual(config['lab_projects'][0]['source'],'02-node')
+        self.assertNotIn('local_lab',config)
+        self.assertNotIn('lab_projects',config)
 
     def test_static_source_is_really_served_after_approved_deploy(self):
         result = self.deploy('01-static', port=8080)
