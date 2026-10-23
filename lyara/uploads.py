@@ -47,7 +47,7 @@ def list_uploads(data_dir):
         try:
             meta=json.loads((directory/'upload.json').read_text(encoding='utf-8'))
             upload_root(data_dir,'upload:'+directory.name)
-            result.append({key:meta[key] for key in ['source','label','files','bytes']})
+            result.append({key:meta[key] for key in ['source','label','files','bytes','github'] if key in meta})
         except (OSError,ValueError,KeyError,TypeError):
             continue
     return result

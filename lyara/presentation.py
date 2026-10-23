@@ -5,8 +5,9 @@ from .security import redact
 
 
 IMPACTS={
+    'create_network':('ساخت اتصال خصوصی تازه برای سایت','هزینهٔ مستقل ساخت شبکه در API اعلام نشده؛ رایگان فرض نمی‌شود. شبکه پس از ساخت برنامه قابل تغییر نیست.','شبکهٔ ساخته‌شده با توقف طرح حذف نمی‌شود؛ بررسی و حذف احتمالی باید جداگانه انجام شود.'),
     'repair_deploy':('اصلاح مشکل انتشار و آماده‌کردن نسخهٔ تازه','تنظیمات و فایل‌های لازم برای اجرای سایت تغییر می‌کنند؛ جزئیات تغییر فایل‌ها قابل مشاهده است.','کد اصلی تو دست‌نخورده می‌ماند؛ اگر نسخهٔ قبلی ثبت شده باشد با اجازهٔ تازه می‌توانیم آن را برگردانیم.'),
-    'create_app':('آماده‌کردن میزبانی سایت با گزینهٔ انتخابی تو','ممکن است هزینه از همین مرحله آغاز شود؛ قیمت زنده در برنامه محاسبه نمی‌شود.','پس از بررسی هزینه و اطلاعات سایت، می‌توانی میزبانی را متوقف یا از حساب خودت حذف کنی.'),
+    'create_app':('آماده‌کردن میزبانی سایت با گزینهٔ انتخابی تو','ممکن است هزینه از همین مرحله آغاز شود؛ مبنای قیمت و محدودیت برآورد در انتخاب میزبانی ثبت شده است.','پس از بررسی هزینه و اطلاعات سایت، می‌توانی میزبانی را متوقف یا از حساب خودت حذف کنی.'),
     'deploy':('انتشار این نسخهٔ سایت و بررسی بازشدن آن','ممکن است نسخهٔ تازه خطا داشته باشد یا سایت برای مدتی قطع شود.','اگر نسخهٔ قبلی ثبت شده باشد، با اجازهٔ تازه می‌توانیم آن را برگردانیم.'),
     'redeploy':('برگرداندن نسخهٔ قبلی سایت','فقط کد سایت برمی‌گردد؛ اطلاعات ذخیره‌شده، تنظیمات و آدرس‌های سایت برنمی‌گردند.','برای عوض‌کردن دوبارهٔ نسخه، اجازهٔ تازه لازم است.'),
     'restart':('راه‌اندازی دوبارهٔ سایت','ممکن است سایت لحظه‌ای قطع شود و کارهای در حال انجام که ذخیره نشده‌اند از دست بروند.','کارهای ذخیره‌نشده قابل برگرداندن نیستند؛ پس از راه‌اندازی وضعیت سایت را بررسی می‌کنیم.'),
@@ -38,7 +39,8 @@ def change_review(request,plan,context):
         elif step.action in {'attach_domain','enable_ssl','create_zone','create_record'}:
             impact += ' — ' + (step.args.get('domain') or step.args.get('zone',''))
         elif step.action in {'create_app','resize'}:
-            choice = next((item for item in context.get('hosting_options',[]) if item['id']==step.args['plan_id']),None)
+            choice=(context.get('billing_quotes',{}).get(step.args['plan_id']) if step.action=='resize' else context.get('hosting_choice'))
+            choice=choice or next((item for item in context.get('hosting_options',[]) if item['id']==step.args['plan_id']),None)
             impact += ' — ' + (choice['title']+'؛ '+choice['cost'] if choice else 'هزینه و شرایط این گزینه در دسترس نیست؛ پیش از موافقت بررسی کن')
         changes.append({'action':step.action,'impact':impact,'risk':risk,'recovery':recovery,'parameters':step.args})
     return {'project':request['project'],'changes':changes,'previous_source':previous,
@@ -54,6 +56,8 @@ def operation_report(state,actions):
         'artifact':artifact,'repair':state.get('repair'),'before':state.get('context',{}),'after':state.get('verification'),
         'results':state.get('results',[]),'pending_release':state.get('pending_release'),
         'events':state.get('events',[]),'actions':actions,'error':state.get('error'),
+        'model_usage':state.get('model_usage',[]),'control_generation':state.get('control_generation'),
+        'build_progress':state.get('build_progress'),
         'limits':['گزارش حاوی شواهد و برداشت مدل است؛ فرضیهٔ مدل به‌تنهایی علت قطعی نیست.',
                   'اطلاعات محرمانهٔ شناخته‌شده پوشانده شده‌اند؛ پیش از انتشار عمومی، متن لاگ‌ها را بازبینی کنید.']}
     return redact(report)

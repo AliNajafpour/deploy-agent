@@ -158,12 +158,12 @@ def check_readiness(env_file=None, environ=None, production=False):
         if not isinstance(values, list) or len(values) > 20:
             raise ValueError()
         options = [HostingOption.model_validate(value) for value in values]
-        if len({option.id for option in options}) != len(options) or any(
+        if len({(option.id,option.bundle_plan_id,option.network or option.network_id,option.network_name) for option in options}) != len(options) or any(
                 not all(value.strip() for value in [option.id, option.title, option.cost]) for option in options):
             raise ValueError()
         add('hosting_options', 'pass' if options else 'warning', 'Hosting choices',
             'Choices are structurally valid; the operator must verify real plan IDs, current prices and terms.' if options else
-            'LYARA_HOSTING_OPTIONS is empty. Creating new sites is blocked; existing sites can keep their current plan.')
+            'No manual fallback choices. New sites need a reachable live catalog or explicit operator choices with bundle and network.')
     except (ValueError, TypeError):
         add('hosting_options', 'error', 'Hosting choices', 'LYARA_HOSTING_OPTIONS must be a JSON list of unique choices with id, title and cost, at most 20 entries.')
     return {'ready': not any(check['status'] == 'error' for check in checks), 'checks': checks}

@@ -1,0 +1,138 @@
+{
+  "date": "2026-10-23",
+  "scope": "Real BoxAPI Luna, simulated cloud API; no live Liara writes",
+  "easy": {
+    "scenario": "01-static",
+    "passed": true,
+    "checks": {
+      "deployment_outcome_correct": true,
+      "actual_static_content": true,
+      "all_child_processes_stopped": true
+    },
+    "usage": [
+      {
+        "provider": "api",
+        "requested_model": "openai/gpt-6-luna",
+        "model": null,
+        "attempt": 1,
+        "http_status": null,
+        "status": "transport_error",
+        "input_tokens": null,
+        "output_tokens": null,
+        "total_tokens": null,
+        "cost_usd": null,
+        "cost_kind": "unknown",
+        "reported_cost": null,
+        "duration_ms": 20219,
+        "recorded_at": "2026-10-23T17:42:31.794101+00:00"
+      },
+      {
+        "provider": "api",
+        "requested_model": "openai/gpt-6-luna",
+        "model": "openai/gpt-6-luna",
+        "attempt": 2,
+        "http_status": 200,
+        "status": "success",
+        "input_tokens": 4052,
+        "output_tokens": 738,
+        "total_tokens": 4790,
+        "cost_usd": null,
+        "cost_kind": "reported",
+        "reported_cost": {
+          "amount": 0.0012435238,
+          "currency": null
+        },
+        "duration_ms": 7578,
+        "recorded_at": "2026-10-23T17:42:39.870355+00:00"
+      }
+    ]
+  },
+  "hard": {
+    "scenario": "nested-backend-http500",
+    "passed": true,
+    "provider": "api",
+    "model": "openai/gpt-6-luna",
+    "baseline": {
+      "available": true,
+      "healthy": false,
+      "status": 500,
+      "url": "https://demo-app.liara.run",
+      "local_lab": true,
+      "probe": "Real FastAPI TestClient POST /summary with []",
+      "cloud_api": "simulated"
+    },
+    "status": "completed",
+    "samples": [
+      {
+        "input": [],
+        "status": 200,
+        "response": {
+          "average": 0
+        }
+      },
+      {
+        "input": [
+          2,
+          4
+        ],
+        "status": 200,
+        "response": {
+          "average": 3.0
+        }
+      },
+      {
+        "input": [
+          0
+        ],
+        "status": 200,
+        "response": {
+          "average": 0.0
+        }
+      }
+    ],
+    "originals_unchanged": true,
+    "approved_artifact_sha256": "fbbfbda199c4e476dea958ac1a172c832d8727d74f825c836da29b3aa60944a7",
+    "uploaded_artifact_sha256": "fbbfbda199c4e476dea958ac1a172c832d8727d74f825c836da29b3aa60944a7",
+    "usage": [
+      {
+        "provider": "api",
+        "requested_model": "openai/gpt-6-luna",
+        "model": "openai/gpt-6-luna",
+        "attempt": 1,
+        "http_status": 200,
+        "status": "success",
+        "input_tokens": 6702,
+        "output_tokens": 948,
+        "total_tokens": 7650,
+        "cost_usd": null,
+        "cost_kind": "reported",
+        "reported_cost": {
+          "amount": 0.0020511113,
+          "currency": null
+        },
+        "duration_ms": 23812,
+        "recorded_at": "2026-10-23T17:42:38.183748+00:00"
+      }
+    ]
+  },
+  "python_tests": {
+    "passed": 284,
+    "duration_seconds": 105.837,
+    "command": "python -m unittest discover -s tests -q"
+  },
+  "node_ui_tests": "passed",
+  "independent_boundary_review": {
+    "confirmed_open_important_findings": 0,
+    "regression_tests_passed": 40
+  },
+  "browser_checks": [
+    "isolated validated source import and private form",
+    "four-sentence approval",
+    "stop invalidation survives disabling",
+    "copy and download handoff",
+    "editing preserves bundle and network",
+    "approved fixture completes with six successful checks",
+    "main UI has no test sites"
+  ],
+  "wheel": "built; files match source; no env or fixtures"
+}

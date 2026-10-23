@@ -65,7 +65,8 @@ class MonitoringChecks(unittest.TestCase):
             self.assertEqual(len(self.monitoring.incidents()), 1)
             self.assertEqual(len(self.planner.calls), 1)
             self.cloud.fail_release = False
-            self.assertEqual(self.monitoring.tick(now=180)[0]['status'], 'healthy')
+            # HTTP recovered; the demo's raw metric values do not establish fresh, known resource units.
+            self.assertEqual(self.monitoring.tick(now=180)[0]['status'], 'unknown')
             self.assertEqual(self.monitoring.incidents()[0]['state'], 'resolved')
             self.cloud.fail_release = True
             self.monitoring.tick(now=240)
@@ -104,7 +105,7 @@ class MonitoringChecks(unittest.TestCase):
             self.monitoring.tick(now=120)
         self.assertEqual(len(self.monitoring.incidents()), 1)
         self.assertEqual(len(self.planner.calls), 1)
-        self.assertEqual(self.monitoring.tick(now=180)[0]['status'], 'healthy')
+        self.assertEqual(self.monitoring.tick(now=180)[0]['status'], 'unknown')
         self.assertEqual(self.monitoring.incidents()[0]['state'], 'resolved')
         self.assertEqual(self.cloud.mutations, [])
 

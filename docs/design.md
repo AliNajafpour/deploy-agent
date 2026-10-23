@@ -85,3 +85,20 @@ this version supports one active instance and up to 25 watches.
 The offline doctor checks operator setup before initializing the service. It neither
 contacts providers nor creates state. Successful checks do not prove live API access,
 DNS/TLS, persistent mounts or plan prices.
+
+## Completion v2
+
+Hosting selection now reads the account-scoped official catalog, bundle plans, networks
+and personal/team wallet independently. Raw identity/storage credentials are discarded.
+Manual choices are an explicit fallback. Source verification discovers conservative GET
+routes, compares repeated samples and requires stable exact-release identity.
+
+Deterministic diagnostics feeds the planner and persistent monitor. Unknown metric units
+and stale samples remain unknown. Emergency control generations and explicit managed-site
+scope are persisted and checked atomically with every action reservation. Already reserved
+external writes may finish; old approvals never revive after controls change.
+
+Public GitHub imports resolve to a commit before reusing ZIP validation. Provider admission
+and retries are bounded on the configured endpoint; actual usage and unknown costs persist.
+Coding handoffs are sanitized quoted data, available through web, CLI and read-only MCP.
+See [completion-v2.md](completion-v2.md) for precise limits, checks and operator setup.

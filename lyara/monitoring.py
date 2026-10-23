@@ -1,12 +1,15 @@
 """Opt-in, read-only polling for one operator and one active service instance."""
 import json
+import math
 import threading
 import time
 import uuid
 from datetime import datetime, timezone
+from statistics import median
 from urllib.parse import urlsplit
 
 from .models import RunRequest
+from .diagnostics import analyse
 from .security import public_https, redact
 
 
@@ -60,7 +63,10 @@ class Monitoring:
                 raise ValueError('حداکثر ۲۵ سایت می‌توانند هم‌زمان پایش شوند.')
             watch = dict(previous or {}, project=project, enabled=enabled, interval=interval, health_url=health_url)
             if not previous or any(watch[key] != previous[key] for key in ('enabled', 'interval', 'health_url')):
-                watch.update(next_check=0, failure_count=0, status='unknown' if enabled else 'disabled')
+                watch.update(next_check=0, failure_count=0, signal_counts={}, recovery_counts={},
+                             status='unknown' if enabled else 'disabled')
+                if previous and health_url != previous['health_url']:
+                    watch.update(latency_history=[], latency_baseline_ms=None, resource_last_at={})
             watch.setdefault('last_check', None)
             watch.setdefault('latest', {})
             self._save_watch(watch)
@@ -85,7 +91,10 @@ class Monitoring:
             release_id = watch['latest']['observations'].get('releases', {}).get('data', {}).get('currentRelease')
             source = self.store.latest_source(watch['project'], release_id or None)
             request = RunRequest(project=watch['project'], intent='diagnose', source=source,
-                health_url=watch['health_url'], message='پایش فقط‌خواندنی: دو بررسی متوالی HTTPS ناموفق بود. '
+                health_url=watch['health_url'], message='پایش فقط‌خواندنی: نشانهٔ پایدار ثبت شد: ' +
+                '، '.join({'outage': 'ناموفق‌بودن اتصال سایت', 'latency': 'کندی نسبت به خط مبنا',
+                           'cpu': 'فشار پردازنده با ظرفیت مشخص', 'memory': 'فشار حافظه با ظرفیت مشخص'}[cause]
+                          for cause in incident.get('reasons', ['outage'])) + '. ' +
                 'شواهد را بررسی و علت‌های ممکن و پیشنهاد قابل بازبینی ارائه کن؛ هیچ اقدامی خودکار تأیید نمی‌شود.')
             run = self.assistant.new(request)
             incident['run_id'] = run['id']
@@ -98,6 +107,40 @@ class Monitoring:
             incident['error'] = 'بررسی پیشنهادی کامل نشد؛ برای جلوگیری از تکرار، خودکار دوباره اجرا نمی‌شود.'
             with self._lock:
                 self._save_incident(incident)
+
+    def _signals(self, watch, health, observations, moment):
+        """Persist measured baselines; never train a baseline on an ongoing slowdown."""
+        analysis = analyse(observations, now=moment, secrets=self.assistant._secret_values(watch['project']))
+        healthy = health.get('available') is True and health.get('healthy') is True
+        failed = (health.get('available') is True or health.get('probe_attempted') is True) and health.get('healthy') is False
+        signals = {'outage': True if failed else False if healthy else None, 'latency': None}
+        latency = health.get('latency_ms')
+        valid_latency = healthy and type(latency) in (int, float) and math.isfinite(latency) and latency >= 0
+        history = [item for item in watch.get('latency_history', [])
+                   if moment - 86400 <= item['at'] <= moment][-120:]
+        baseline = watch.get('latency_baseline_ms')
+        sufficient = len(history) >= 5 and history[-1]['at'] - history[0]['at'] >= 240
+        if valid_latency and baseline is not None and sufficient:
+            signals['latency'] = latency >= max(1000, baseline * 2)
+        # Fixed baseline is intentionally not adapted to slow responses. A destination change resets it.
+        if valid_latency and (baseline is None or latency < max(1000, baseline * 2)):
+            if not history or moment - history[-1]['at'] >= 60:
+                history.append({'at': moment, 'latency_ms': latency})
+            history = history[-120:]
+            if baseline is None and len(history) >= 5 and history[-1]['at'] - history[0]['at'] >= 240:
+                baseline = median(item['latency_ms'] for item in history)
+        watch.update(latency_history=history, latency_baseline_ms=baseline)
+        fresh_readings = {'outage': True, 'latency': True}
+        last_at = watch.setdefault('resource_last_at', {})
+        for name in ('cpu', 'memory'):
+            resource = analysis['resources'][name]
+            signals[name] = resource['pressure'] if resource['freshness'] == 'fresh' and resource['sample_count'] >= 5 else None
+            stamp = resource.get('latest_at')
+            # Re-fetching the same metric window cannot count as another independent sample.
+            fresh_readings[name] = stamp is not None and (last_at.get(name) is None or stamp > last_at[name])
+            if stamp is not None:
+                last_at[name] = max(stamp, last_at.get(name, stamp))
+        return signals, fresh_readings, analysis
 
     def tick(self, now=None):
         if self._stop.is_set() or not self._tick_lock.acquire(blocking=False):
@@ -122,37 +165,59 @@ class Monitoring:
                 if self._stop.is_set():
                     break
                 try:
-                    health = self.assistant.cloud.health(watch['health_url'] or 'https://' + watch['project'] + '.liara.run')
+                    health = self.assistant.monitor_probe(watch['project'],observations,watch['health_url'])
                 except Exception:
                     health = {'available': False, 'healthy': False, 'error': 'بررسی HTTPS ممکن نبود.'}
                 if self._stop.is_set():
                     break
-                failed = (health.get('available') is True or health.get('probe_attempted') is True) and health.get('healthy') is False
                 healthy = health.get('available') is True and health.get('healthy') is True
-                telemetry = all(observations.get(key, {}).get('available') is True
+                telemetry = all(isinstance(observations.get(key), dict) and observations[key].get('available') is True
                                 for key in ('project', 'logs', 'events', 'releases', 'cpu', 'memory'))
-                telemetry = telemetry and all(any(series.get('values') for series in
-                    observations[key].get('data', {}).get('result', []) if isinstance(series, dict)) for key in ('cpu', 'memory'))
                 with self._lock:
                     # Disabling a watch while its HTTP request is in flight cancels further processing.
                     current = next((item for item in self.list() if item['project'] == watch['project']), None)
                     if not current or not current['enabled'] or any(current[key] != watch[key] for key in ('interval', 'health_url')):
                         continue
-                    watch['failure_count'] = min(2, watch['failure_count'] + 1) if failed else 0
-                    watch['status'] = ('unhealthy' if watch['failure_count'] >= 2 else 'pending') if failed else (
-                        'healthy' if healthy and telemetry else 'unknown')
+                    gap = moment - watch.get('last_check_epoch', moment)
+                    if gap > max(180, watch['interval'] * 3) or gap < 0:
+                        watch.update(signal_counts={}, recovery_counts={})
+                    signals, fresh_readings, analysis = self._signals(watch, health, observations, moment)
+                    counts = watch.setdefault('signal_counts', {'outage': watch['failure_count']})
+                    for cause, signal in signals.items():
+                        counts[cause] = min(3, counts.get(cause, 0) + 1) if signal is True and fresh_readings[cause] else (
+                            counts.get(cause, 0) if signal is True else 0)
+                    watch['failure_count'] = min(2, counts.get('outage', 0))
+                    confirmed = [cause for cause, count in counts.items() if count >= (2 if cause == 'outage' else 3)]
                     watch.update(last_check=checked_at, next_check=moment + watch['interval'],
-                        latest=redact({'health': health, 'observations': observations}, self.assistant._secret_values(watch['project'])))
+                        last_check_epoch=moment,
+                        latest=redact({'health': health, 'observations': observations, 'signals': signals,
+                                       'analysis': analysis}, self.assistant._secret_values(watch['project'])))
                     incident = next((item for item in self.incidents(watch['project']) if item['state'] == 'open'), None)
-                    diagnose = watch['failure_count'] >= 2 and incident is None
+                    diagnose = bool(confirmed) and incident is None
                     if diagnose:
                         incident = {'id': str(uuid.uuid4()), 'project': watch['project'], 'state': 'open',
-                                    'opened_at': checked_at, 'closed_at': None, 'run_id': None, 'health': health}
+                                    'opened_at': checked_at, 'closed_at': None, 'run_id': None, 'health': health,
+                                    'reasons': confirmed, 'active_causes': confirmed.copy(), 'evidence': watch['latest']}
                         # Reserve the incident before contacting the model; interrupted diagnostics are never replayed.
                         self._save_incident(incident)
-                    elif incident and healthy:
-                        incident.update(state='resolved', closed_at=checked_at)
+                    elif incident:
+                        reasons = set(incident.get('reasons', ['outage'])) | set(confirmed)
+                        active = set(incident.get('active_causes', incident.get('reasons', ['outage']))) | set(confirmed)
+                        recovery = watch.setdefault('recovery_counts', {})
+                        for cause in active.copy():
+                            recovery[cause] = recovery.get(cause, 0) + 1 if signals.get(cause) is False and fresh_readings[cause] else (
+                                recovery.get(cause, 0) if signals.get(cause) is False else 0)
+                            if recovery[cause] >= (1 if cause == 'outage' else 2):
+                                active.remove(cause)
+                                recovery[cause] = 0
+                        incident.update(reasons=sorted(reasons), active_causes=sorted(active))
+                        if not active:
+                            incident.update(state='resolved', closed_at=checked_at)
                         self._save_incident(incident)
+                    watch['status'] = ('unhealthy' if incident and incident['state'] == 'open' else 'pending'
+                                       if any(value is True for value in signals.values()) else
+                                       'healthy' if healthy and telemetry and all(signals[name] is False
+                                           for name in ('cpu', 'memory')) else 'unknown')
                     self._save_watch(watch)
                 checked.append(redact(watch, self.assistant._secret_values(watch['project'])))
                 if diagnose and not self._stop.is_set():

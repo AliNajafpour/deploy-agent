@@ -9,16 +9,19 @@
     <a class="brand" href="/" aria-label="لیارا، صفحهٔ اصلی"><svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true"><path d="m20 3 14 8-14 8-14-8Z" fill="#84fbc6"/><path d="m6 15 12 7v15L6 30Z" fill="#58e5d1"/><path d="m22 22 12-7v15l-12 7Z" fill="#20bde8"/></svg><span>لیارا<small>دستیار انتشار</small></span></a>
     <nav class="site-nav" aria-label="انتخاب سایت"><select id="projects" aria-label="سایت‌های من"><option value="">سایت جدید</option></select><button id="new-project" class="text-button">+ جدید</button></nav>
     <span id="hosting-status" class="environment" hidden></span>
+    <button id="emergency-toggle" class="emergency-button" type="button" hidden>توقف تغییرات</button>
     <button class="text-button access-button" id="access-button" aria-label="ورود و اطلاعات اتصال"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg><span id="connection">اتصال…</span></button>
   </header>
   <main class="workspace">
     <div class="workspace-top"><select id="history" aria-label="درخواست‌های قبلی" hidden></select></div>
+    <p id="emergency-status" class="stop-notice" role="status" hidden></p>
     <div id="composer">
       <div class="desk-heading"><h1 id="workspace-title">سایتت را آنلاین کن.</h1></div>
       <div class="mode-switch" role="group" aria-label="نوع درخواست"><button data-mode="deploy" class="selected" aria-pressed="true">انتشار سایت</button><button data-mode="diagnose" aria-pressed="false">بررسی مشکل</button><details class="more-actions"><summary>بیشتر</summary><div class="extra-actions"><button data-mode="repair" aria-pressed="false">اصلاح مشکل سایت</button><button data-mode="operate" aria-pressed="false">تغییر سایت</button><button data-mode="monitor" aria-pressed="false">بررسی وضعیت</button></div></details></div>
       <form id="request-form" class="request-form">
-        <input id="project" type="hidden"><input id="source" type="hidden"><input id="plan" type="hidden"><input id="port" type="hidden"><input id="platform" type="hidden"><input id="health" type="hidden">
+        <input id="project" type="hidden"><input id="source" type="hidden"><input id="plan" type="hidden"><input id="bundle" type="hidden"><input id="network" type="hidden"><input id="network-name" type="hidden"><input id="port" type="hidden"><input id="platform" type="hidden"><input id="health" type="hidden">
         <label class="upload-label"><svg class="upload-icon" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 28H9a6 6 0 0 1-.8-12 12 12 0 0 1 23.1-1.4A7 7 0 0 1 32 28h-4M20 34V19m-6 6 6-6 6 6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="upload-action">انتخاب فایل ZIP</span><input id="site-upload" type="file" accept=".zip,application/zip" aria-label="فایل‌های سایت" aria-describedby="upload-status"><span id="upload-status" class="upload-status" role="status">فایل ZIP سایتت را انتخاب کن.</span></label>
+        <details class="optional-question" id="github-source" hidden><summary>یا لینک گیت‌هاب</summary><label>مخزن عمومی سایت<input id="github-url" type="url" placeholder="https://github.com/you/site" dir="ltr" maxlength="1000" autocomplete="off"></label></details>
         <label class="message-label">چه کاری انجام بدهم؟<textarea id="message" rows="2" required maxlength="6000" placeholder="سایتم را منتشر کن…"></textarea></label>
         <details class="optional-question"><summary>اتصال آدرس دلخواه</summary><label>آدرسی که قبلاً خریده‌ای<input id="domain" placeholder="example.com" dir="ltr" autocomplete="off"></label></details>
         <div class="form-footer"><button class="primary" id="submit" type="submit">بررسی درخواست <span aria-hidden="true">←</span></button></div>
@@ -32,14 +35,16 @@
         <form id="answer-form" class="answer-form" hidden>
           <div id="project-inputs" class="project-inputs"></div>
           <label id="answer-hosting-label" hidden>گزینهٔ میزبانی<select id="answer-hosting"></select></label>
+          <p id="hosting-choice-reason" class="muted" hidden></p>
           <p id="hosting-unavailable" class="risk-note" hidden>گزینه‌های هزینه در دسترس نیستند؛ تا مشخص‌شدن هزینه، میزبانی جدید ساخته نمی‌شود.</p>
           <label id="answer-message-label">پاسخ تو<textarea id="answer-message" rows="2" maxlength="3000" placeholder="پاسخ کوتاه؛ رمز و کلید را در کادر بالا وارد کن."></textarea></label>
           <button class="primary" id="send-answer" type="submit">ادامهٔ بررسی <span aria-hidden="true">←</span></button>
         </form>
-        <div id="verification"></div>
+        <p id="build-progress" class="build-progress" role="status" hidden></p><div id="verification"></div>
         <div class="next-actions"><button class="quiet" id="repair" hidden>بررسی و رفع مشکل</button></div>
         <details id="technical-details" class="technical-details"><summary id="details-label">جزئیات بررسی</summary>
-          <div class="run-tools"><button class="quiet" id="download-report">دریافت گزارش</button><button class="quiet" id="download-patch" hidden>دریافت اصلاحیهٔ کد</button><button class="quiet" id="resume" hidden>ادامهٔ کار متوقف‌شده</button><button class="quiet" id="recheck" hidden>بررسی دوباره</button><button class="quiet" id="recovery" hidden>برگرداندن نسخهٔ قبلی</button></div>
+          <div class="run-tools"><button class="quiet" id="download-report">دریافت گزارش</button><button class="quiet" id="download-patch" hidden>دریافت اصلاحیهٔ کد</button><button class="quiet" id="copy-handoff" hidden>کپی برای ایجنت کدنویسی</button><button class="quiet" id="download-handoff" hidden>دریافت برای ایجنت کدنویسی</button><button class="quiet" id="resume" hidden>ادامهٔ کار متوقف‌شده</button><button class="quiet" id="recheck" hidden>بررسی دوباره</button><button class="quiet" id="recovery" hidden>برگرداندن نسخهٔ قبلی</button></div>
+          <p id="handoff-status" class="muted" role="status" hidden></p><textarea id="handoff-text" class="handoff-text" rows="8" dir="auto" readonly aria-label="خروجی برای ایجنت کدنویسی" hidden></textarea><div id="computed-evidence"></div><div id="model-usage"></div>
           <div id="limitations"></div><p id="planner-summary"></p><p id="run-parent" class="muted"></p><code id="approval-digest" dir="ltr"></code><pre id="setup-info" class="step-args"></pre><div id="steps"></div><div id="artifact"></div><div id="repair-preview"></div><div id="evidence"></div><details class="event-details"><summary>رویدادها</summary><ol id="events" class="events"></ol></details>
         </details>
       </div>
@@ -49,6 +54,6 @@
       <p id="watch-status" class="muted" role="status"></p><div id="incidents"></div>
     </section>
   </main>
-  <dialog id="access-dialog"><form method="dialog"><div class="dialog-heading"><h2>اتصال به برنامه</h2><button class="text-button" aria-label="بستن">×</button></div><label>کد ورود<input id="access-token" type="password" autocomplete="current-password" dir="ltr"></label><button id="save-access" class="primary" value="save">ورود</button><details class="connection-details"><summary>اطلاعات اتصال</summary><pre id="configuration" dir="ltr"></pre><button type="button" id="refresh" class="quiet">تازه‌سازی سایت‌ها</button></details></form></dialog>
+  <dialog id="access-dialog"><form method="dialog"><div class="dialog-heading"><h2>اتصال به برنامه</h2><button class="text-button" aria-label="بستن">×</button></div><label>کد ورود<input id="access-token" type="password" autocomplete="current-password" dir="ltr"></label><button id="save-access" class="primary" value="save">ورود</button><details class="connection-details"><summary>اطلاعات اتصال</summary><pre id="configuration" dir="ltr"></pre><div id="management-controls" hidden><p id="management-status" class="muted"></p><button type="button" id="manage-toggle" class="quiet">اجازهٔ مدیریت این سایت</button></div><button type="button" id="refresh" class="quiet">تازه‌سازی سایت‌ها</button></details></form></dialog>
 </body>
 </html>

@@ -28,6 +28,21 @@ def main():
     commands.add_parser('mcp')
     commands.add_parser('projects')
     commands.add_parser('runs')
+    commands.add_parser('controls', help='Read emergency stop, managed sites and permission generation')
+    commands.add_parser('hosting', help='Read hosting catalog and account availability without guessing prices')
+    for name in ['emergency', 'manage']:
+        sub = commands.add_parser(name)
+        if name == 'manage':
+            sub.add_argument('project')
+        choice = sub.add_mutually_exclusive_group(required=True)
+        choice.add_argument('--enable', action='store_true')
+        choice.add_argument('--disable', action='store_true')
+    github = commands.add_parser('github', help='Import a public GitHub repository pinned to an exact commit; no deployment')
+    github.add_argument('url')
+    github.add_argument('--ref')
+    handoff = commands.add_parser('handoff', help='Print a redacted handoff for a coding agent')
+    handoff.add_argument('run_id')
+    handoff.add_argument('--format', choices=['json', 'markdown'], default='markdown')
     status = commands.add_parser('status')
     status.add_argument('run_id')
     approve = commands.add_parser('approve')
@@ -45,12 +60,19 @@ def main():
     answer.add_argument('--port',type=int)
     answer.add_argument('--platform')
     answer.add_argument('--plan-id')
+    answer.add_argument('--hosting-choice')
+    answer.add_argument('--bundle-plan-id')
+    answer.add_argument('--network')
+    answer.add_argument('--network-name')
     for name in ['deploy', 'diagnose', 'operate', 'monitor', 'repair']:
         sub = commands.add_parser(name)
         sub.add_argument('project')
         sub.add_argument('--message', default='')
         sub.add_argument('--source', default='.')
         sub.add_argument('--plan-id', default='')
+        sub.add_argument('--bundle-plan-id', default='')
+        sub.add_argument('--network', default='')
+        sub.add_argument('--network-name', default='')
         sub.add_argument('--platform', default='')
         sub.add_argument('--port', type=int)
         sub.add_argument('--domain', default='')
@@ -71,7 +93,8 @@ def main():
         raise SystemExit(0 if result['ready'] else 1)
     service = None
     try:
-        service = create_assistant(args.demo, model=args.command not in {'mcp', 'projects', 'status', 'runs', 'approve', 'monitor','report','recheck','recovery'})
+        service = create_assistant(args.demo, model=args.command not in {'mcp', 'projects', 'status', 'runs', 'approve', 'monitor',
+            'report', 'recheck', 'recovery', 'controls', 'hosting', 'emergency', 'manage', 'github', 'handoff'})
         if args.command == 'serve':
             import uvicorn
             from .web import create_app
@@ -89,12 +112,40 @@ def main():
             emit(service.cloud.projects())
         elif args.command == 'runs':
             emit(service.runs())
+        elif args.command == 'controls':
+            emit(service.controls())
+        elif args.command == 'hosting':
+            emit(service.hosting_catalog())
+        elif args.command in {'emergency', 'manage'}:
+            if args.command == 'manage':
+                RunRequest(message='scope', project=args.project)
+            controls = service.controls()
+            generation = controls['generation']
+            if (args.command == 'emergency' and not args.enable) or (args.command == 'manage' and args.enable):
+                if not sys.stdin.isatty():
+                    raise ValueError('دادن دسترسی یا پایان توقف به تأیید انسان در ترمینال تعاملی نیاز دارد؛ از رابط وب استفاده کنید.')
+                confirmation = f'RESUME {generation}' if args.command == 'emergency' else f'MANAGE {args.project} {generation}'
+                if input(f'Type {confirmation} to confirm: ').strip() != confirmation:
+                    raise ValueError('تأیید مطابقت نداشت؛ تغییری انجام نشد.')
+            result = service.emergency(args.enable, generation) if args.command == 'emergency' else service.manage(args.project, args.enable, generation)
+            emit(result)
+        elif args.command == 'github':
+            from .github_source import import_github
+            emit(import_github(args.url, service.data_dir, service.vault, ref=args.ref))
+        elif args.command == 'handoff':
+            result = service.handoff(args.run_id)
+            if args.format == 'markdown':
+                from .handoff import handoff_markdown
+                print(handoff_markdown(result))
+            else:
+                emit(result)
         elif args.command == 'status':
             emit(service.get(args.run_id))
         elif args.command == 'resume':
             emit(service.resume(args.run_id))
         elif args.command=='answer':
-            emit(service.answer(args.run_id,{'message':args.message,'port':args.port,'platform':args.platform,'plan_id':args.plan_id}))
+            emit(service.answer(args.run_id,{'message':args.message,'port':args.port,'platform':args.platform,'plan_id':args.plan_id,
+                'hosting_choice':args.hosting_choice,'bundle_plan_id':args.bundle_plan_id,'network':args.network,'network_name':args.network_name}))
         elif args.command=='recheck':
             emit(service.recheck(args.run_id))
         elif args.command=='recovery':
@@ -127,6 +178,7 @@ def main():
         else:
             request = RunRequest(message=args.message or args.command, intent=args.command, project=args.project,
                 source=args.source, plan_id=args.plan_id, platform=args.platform, port=args.port,
+                bundle_plan_id=args.bundle_plan_id,network=args.network,network_name=args.network_name,
                 domain=args.domain, health_url=args.health_url)
             emit(service.start(request))
     except (ValueError, RuntimeError, OSError) as error:

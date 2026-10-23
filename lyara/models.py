@@ -13,6 +13,9 @@ class RunRequest(StrictModel):
     project: str = Field(pattern=r'^[a-z0-9][a-z0-9-]{0,62}$')
     source: str = Field(default='.', max_length=500)
     plan_id: str = Field(default='', max_length=100)
+    bundle_plan_id: str = Field(default='',max_length=100)
+    network: str = Field(default='',max_length=100)
+    network_name: str = Field(default='',max_length=63)
     platform: str = Field(default='', max_length=30)
     port: int | None = Field(default=None, ge=1, le=65535)
     domain: str = Field(default='', max_length=253)
@@ -20,7 +23,7 @@ class RunRequest(StrictModel):
 
 
 class Step(StrictModel):
-    action: Literal['create_app', 'deploy', 'restart', 'scale', 'resize', 'update_env',
+    action: Literal['create_network','create_app', 'deploy', 'restart', 'scale', 'resize', 'update_env',
                     'attach_domain', 'enable_ssl', 'create_zone', 'create_record', 'redeploy', 'repair_deploy']
     title: str = Field(min_length=1, max_length=300)
     reason: str = Field(min_length=1, max_length=1500)
@@ -31,6 +34,10 @@ class HostingOption(StrictModel):
     id: str = Field(min_length=1, max_length=100)
     title: str = Field(min_length=1, max_length=100)
     cost: str = Field(min_length=1, max_length=300)
+    bundle_plan_id: str = Field(default='',max_length=100)
+    network: str = Field(default='',max_length=100)
+    network_id: str = Field(default='',max_length=100)
+    network_name: str = Field(default='',max_length=63)
 
 
 class Answer(StrictModel):
@@ -38,6 +45,10 @@ class Answer(StrictModel):
     port: int | None = Field(default=None,ge=1,le=65535)
     platform: str | None = Field(default=None,max_length=30)
     plan_id: str | None = Field(default=None,max_length=100)
+    hosting_choice: str | None = Field(default=None,max_length=64)
+    network: str | None = Field(default=None,max_length=100)
+    bundle_plan_id: str | None = Field(default=None,max_length=100)
+    network_name: str | None = Field(default=None,max_length=63)
 
 
 class InputRequest(StrictModel):
@@ -51,6 +62,8 @@ class InputValues(StrictModel):
     values: dict[str,str] = Field(min_length=1,max_length=100)
     message: str = Field(default='',max_length=3000)
     plan_id: str | None = Field(default=None,max_length=100)
+    hosting_choice: str | None = Field(default=None,max_length=64)
+    network: str | None = Field(default=None,max_length=100)
 
 
 class Plan(StrictModel):

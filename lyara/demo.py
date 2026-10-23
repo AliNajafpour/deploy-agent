@@ -17,6 +17,7 @@ class DemoCloud:
 
     def client(self):
         client = LiaraClient('offline-demo-token', transport=httpx.MockTransport(self.handle))
+        client.sandbox=True
         client.health = lambda url: {'available': True, 'healthy': not self.fail_release,
                                     'status': 500 if self.fail_release else 200, 'latency_ms': 42,
                                     'url': url, 'simulated': True}

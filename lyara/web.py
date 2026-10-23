@@ -30,6 +30,15 @@ class WatchSettings(StrictModel):
     health_url: str = Field(default='',max_length=1000)
 
 
+class ControlChange(StrictModel):
+    enabled: bool = Field(strict=True)
+    expected_generation: int = Field(ge=0,strict=True)
+
+
+class GitHubSource(StrictModel):
+    url: str = Field(min_length=1,max_length=1000)
+
+
 def create_app(assistant, access_token='', allowed_hosts=None):
     allowed_hosts = allowed_hosts or {'127.0.0.1', 'localhost', '::1'}
     executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='lyara')
@@ -79,6 +88,10 @@ def create_app(assistant, access_token='', allowed_hosts=None):
     async def cloud_error(request, error):
         return JSONResponse({'detail': str(error)}, status_code=502)
 
+    @app.exception_handler(PermissionError)
+    async def denied(request,error):
+        return JSONResponse({'detail':str(error)},status_code=403)
+
     @app.get('/')
     def index():
         return FileResponse(static / 'index.html')
@@ -90,11 +103,35 @@ def create_app(assistant, access_token='', allowed_hosts=None):
                 'hosting_connected': bool(getattr(assistant.cloud,'connected',True)),
                 'upload_max_bytes': MAX_UPLOAD,
                 'hosting_options': assistant.hosting_options(),
-                'capabilities': ['repair', 'backend-repair', 'monitoring', 'deploy', 'logs', 'events', 'metrics', 'restart', 'env', 'resize', 'dns', 'ssl']}
+                'capabilities': ['repair', 'backend-repair', 'monitoring', 'github', 'emergency', 'handoff', 'deploy', 'logs', 'events', 'metrics', 'restart', 'env', 'resize', 'dns', 'ssl']}
+
+    @app.get('/api/hosting')
+    def hosting():
+        return assistant.hosting_catalog()
+
+    @app.get('/api/controls')
+    def controls():
+        return assistant.controls()
+
+    @app.put('/api/controls')
+    async def emergency(change:ControlChange):
+        # A separate, fast transaction must not wait behind a model or cloud operation.
+        return assistant.emergency(change.enabled,change.expected_generation)
+
+    @app.put('/api/managed/{name}')
+    def managed(name:str,change:ControlChange):
+        RunRequest(message='scope',project=name)
+        return assistant.manage(name,change.enabled,change.expected_generation)
 
     @app.get('/api/sources')
     def sources():
         return list_uploads(assistant.data_dir)
+
+    @app.post('/api/github',status_code=201)
+    async def github(source:GitHubSource):
+        from .github_source import import_github
+        from starlette.concurrency import run_in_threadpool
+        return await run_in_threadpool(import_github,source.url,assistant.data_dir,assistant.vault)
 
     @app.post('/api/uploads',status_code=201)
     async def upload(request:Request):
@@ -200,10 +237,19 @@ def create_app(assistant, access_token='', allowed_hosts=None):
         if not diff:raise HTTPException(404,'اصلاحیه‌ای برای این بررسی ثبت نشده است.')
         return PlainTextResponse(diff,media_type='text/x-diff',headers={'Content-Disposition':'attachment; filename="site-fix.patch"'})
 
+    @app.get('/api/runs/{run_id}/handoff')
+    def handoff(run_id:str,format:str='markdown'):
+        if format not in {'json','markdown'}:raise ValueError('قالب خروجی باید json یا markdown باشد.')
+        result=assistant.handoff(run_id)
+        if format=='json':return result
+        from .handoff import handoff_markdown
+        return PlainTextResponse(handoff_markdown(result),media_type='text/markdown',
+            headers={'Content-Disposition':'attachment; filename="coding-handoff.md"'})
+
     @app.post('/api/runs/{run_id}/approval', status_code=202)
     def approve(run_id: str, decision: Approval):
         state = assistant.get(run_id)
-        if state.get('plan_digest') != decision.plan_digest:
+        if state.get('status')!='awaiting_approval' or state.get('plan_digest') != decision.plan_digest:
             raise HTTPException(409, 'طرح تغییر کرده یا شناسهٔ آن نادرست است.')
         executor.submit(assistant.approve, run_id, decision.plan_digest, decision.approved)
         return state

@@ -20,7 +20,9 @@ def redact(value, secrets=()):
         env_entry = 'key' in value and 'value' in value
         result = {}
         for key, item in value.items():
-            if key == 'env_refs' and isinstance(item, dict):
+            if key in {'input_tokens','output_tokens','total_tokens','cached_tokens','reasoning_tokens'} and (item is None or type(item) is int and item>=0):
+                result[key]=item
+            elif key == 'env_refs' and isinstance(item, dict):
                 result[key] = {str(k): v if isinstance(v, str) and re.fullmatch(r'LYARA_DEPLOY_[A-Za-z0-9_]+', v)
                                else '[REDACTED]' for k, v in item.items()}
             elif key == 'env_fingerprints' and isinstance(item, dict):
