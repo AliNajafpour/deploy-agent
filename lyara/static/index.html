@@ -1,15 +1,15 @@
 <!doctype html>
 <html lang="fa" dir="rtl">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light">
-  <title>لیارا</title><link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="dark">
+  <title>لیارا | دستیار انتشار</title><link rel="preload" href="/static/vazirmatn.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script>
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/" aria-label="لیارا، صفحهٔ اصلی"><span class="brand-mark">لـ</span>لیارا</a>
+    <a class="brand" href="/" aria-label="لیارا، صفحهٔ اصلی"><svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true"><path d="m20 3 14 8-14 8-14-8Z" fill="#84fbc6"/><path d="m6 15 12 7v15L6 30Z" fill="#58e5d1"/><path d="m22 22 12-7v15l-12 7Z" fill="#20bde8"/></svg><span>لیارا<small>دستیار انتشار</small></span></a>
     <nav class="site-nav" aria-label="انتخاب سایت"><select id="projects" aria-label="سایت‌های من"><option value="">سایت جدید</option></select><button id="new-project" class="text-button">+ جدید</button></nav>
     <span id="hosting-status" class="environment" hidden></span>
-    <button class="text-button access-button" id="access-button" aria-label="ورود و اطلاعات اتصال"><span id="connection">اتصال…</span><span aria-hidden="true">⌁</span></button>
+    <button class="text-button access-button" id="access-button" aria-label="ورود و اطلاعات اتصال"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg><span id="connection">اتصال…</span></button>
   </header>
   <main class="workspace">
     <div class="workspace-top"><select id="history" aria-label="درخواست‌های قبلی" hidden></select></div>
@@ -18,7 +18,7 @@
       <div class="mode-switch" role="group" aria-label="نوع درخواست"><button data-mode="deploy" class="selected" aria-pressed="true">انتشار سایت</button><button data-mode="diagnose" aria-pressed="false">بررسی مشکل</button><details class="more-actions"><summary>بیشتر</summary><div class="extra-actions"><button data-mode="repair" aria-pressed="false">اصلاح انتشار</button><button data-mode="operate" aria-pressed="false">تغییر سایت</button><button data-mode="monitor" aria-pressed="false">بررسی وضعیت</button></div></details></div>
       <form id="request-form" class="request-form">
         <input id="project" type="hidden"><input id="source" type="hidden"><input id="plan" type="hidden"><input id="port" type="hidden"><input id="platform" type="hidden"><input id="health" type="hidden">
-        <label class="upload-label"><span class="upload-action">انتخاب فایل ZIP <span aria-hidden="true">↑</span></span><input id="site-upload" type="file" accept=".zip,application/zip" aria-label="فایل‌های سایت" aria-describedby="upload-status"><span id="upload-status" class="upload-status" role="status">فایل ZIP سایتت را انتخاب کن.</span></label>
+        <label class="upload-label"><svg class="upload-icon" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 28H9a6 6 0 0 1-.8-12 12 12 0 0 1 23.1-1.4A7 7 0 0 1 32 28h-4M20 34V19m-6 6 6-6 6 6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="upload-action">انتخاب فایل ZIP</span><input id="site-upload" type="file" accept=".zip,application/zip" aria-label="فایل‌های سایت" aria-describedby="upload-status"><span id="upload-status" class="upload-status" role="status">فایل ZIP سایتت را انتخاب کن.</span></label>
         <label class="message-label">چه کاری انجام بدهم؟<textarea id="message" rows="2" required maxlength="6000" placeholder="سایتم را منتشر کن…"></textarea></label>
         <details class="optional-question"><summary>اتصال آدرس دلخواه</summary><label>آدرسی که قبلاً خریده‌ای<input id="domain" placeholder="example.com" dir="ltr" autocomplete="off"></label></details>
         <div class="form-footer"><button class="primary" id="submit" type="submit">بررسی درخواست <span aria-hidden="true">←</span></button></div>
