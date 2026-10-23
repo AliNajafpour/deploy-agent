@@ -1,0 +1,15 @@
+.git
+.env
+.env.*
+.lyara
+.venv
+.venv*
+.cache
+**/__pycache__
+**/*.pyc
+*.egg-info
+build
+dist
+docs
+tests
+examples
