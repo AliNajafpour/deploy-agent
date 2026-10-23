@@ -34,7 +34,8 @@ def redact(value, secrets=()):
     if isinstance(value, str):
         for secret in secrets:
             if secret:
-                value = value.replace(secret, '[REDACTED]')
+                value = (value.replace(secret, '[REDACTED]') if len(secret)>=8 else
+                         re.sub(r'(?<![A-Za-z0-9_])'+re.escape(secret)+r'(?![A-Za-z0-9_])','[REDACTED]',value))
         return SECRET_TEXT.sub(lambda m: (next((g for g in m.groups() if g), '') + '[REDACTED]'), value)
     return value
 

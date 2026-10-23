@@ -25,6 +25,26 @@ class RepairChecks(unittest.TestCase):
         self.service.close()
         self.tmp.cleanup()
 
+    def test_repair_builder_accepts_bind_fix_but_rejects_response_changes(self):
+        import io
+        from tests.repair_agent import RepairBuilder,PROJECTS
+        builder=object.__new__(RepairBuilder)
+        builder.fixture='02-missing-package'
+        builder.app=PROJECTS/builder.fixture
+        files={p.name:p.read_bytes() for p in builder.app.iterdir() if p.is_file()}
+        files['requirements.txt']=b'colorama==0.4.6\n'
+        files['app.py']=files['app.py'].replace(b'127.0.0.1',b'0.0.0.0')
+        def bundle():
+            output=io.BytesIO()
+            with tarfile.open(fileobj=output,mode='w:gz') as archive:
+                for name,content in files.items():
+                    member=tarfile.TarInfo(name);member.size=len(content)
+                    archive.addfile(member,io.BytesIO(content))
+            return output.getvalue()
+        builder.inspect_archive(bundle())
+        files['app.py']=files['app.py'].replace(b'missing dependency repaired',b'changed website response')
+        with self.assertRaises(AssertionError):builder.inspect_archive(bundle())
+
     def edit(self, name='package.json', content=None):
         path = self.root / name
         return {'path': name, 'before_sha256': hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None,

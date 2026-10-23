@@ -62,7 +62,7 @@ def inspect_project(root):
             'hints': hints, 'questions': questions}
 
 
-def snapshot(root, artifact_dir, excluded_roots=(), file_modes=None):
+def snapshot(root, artifact_dir, excluded_roots=(), file_modes=None, secrets=()):
     root, artifact_dir = Path(root).resolve(), Path(artifact_dir).resolve()
     excluded_roots = [Path(path).resolve() for path in (*excluded_roots, artifact_dir)]
     def excluded(path):
@@ -101,6 +101,10 @@ def snapshot(root, artifact_dir, excluded_roots=(), file_modes=None):
                         raw = path.read_bytes()
                         if b'PRIVATE KEY-----' in raw or re.search(rb'\bsk-(?:ant-)?[A-Za-z0-9_-]{20,}', raw):
                             raise ValueError('فایل مشکوک به کلید محرمانه در بسته وجود دارد: ' + relative)
+                    if secrets:
+                        source_bytes=path.read_bytes()
+                        if any((secret.encode() in source_bytes if len(secret)>=8 else re.search(rb"[\"']"+re.escape(secret.encode())+rb"[\"']",source_bytes)) for secret in secrets if secret):
+                            raise ValueError('اطلاعات محرمانه داخل فایل کد پیدا شد؛ پیش از انتشار باید از کد جدا شود: '+relative)
                     def preserve_mode(info):
                         if file_modes and relative in file_modes:
                             info.mode = file_modes[relative] & 0o777

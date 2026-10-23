@@ -14,12 +14,13 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, interrupt
 
 from .liara import LiaraError
-from .models import Answer, HostingOption, Plan, RunRequest
+from .models import Answer, HostingOption, InputValues, Plan, RunRequest, Step
 from .presentation import change_review, operation_report
 from .project import inspect_project, snapshot
 from .security import redact, workspace_path
 from .repair import deployment_files, stage_repair, validate_edits
 from .store import Store, now
+from .inputs import InputVault, allowed_name, discover_inputs, input_label, read_source_env
 
 
 def digest(value):
@@ -59,15 +60,15 @@ PLATFORMS = {'node', 'next', 'nuxt', 'python', 'django', 'flask', 'php', 'larave
 
 
 def validate_plan(plan, context, artifact, request):
-    if request['intent'] == 'deploy' and not plan.questions:
+    if request['intent'] == 'deploy' and not plan.questions and not plan.inputs:
         if sum(step.action == 'deploy' for step in plan.steps) != 1:
             raise ValueError('طرح انتشار باید دقیقاً یک مرحلهٔ آپلود و ساخت نسخه داشته باشد.')
         if not context['exists'] and not any(step.action == 'create_app' for step in plan.steps):
             raise ValueError('طرح اولین انتشار باید ایجاد برنامه را هم پوشش دهد.')
-    if request['intent'] == 'repair' and not plan.questions:
+    if request['intent'] == 'repair' and not plan.questions and not plan.inputs:
         if sum(step.action == 'repair_deploy' for step in plan.steps) != 1:
             raise ValueError('طرح اصلاح انتشار باید دقیقاً یک بستهٔ اصلاحی داشته باشد.')
-        if any(step.action not in {'create_app', 'repair_deploy'} for step in plan.steps):
+        if any(step.action not in {'create_app', 'update_env', 'repair_deploy'} for step in plan.steps):
             raise ValueError('طرح اصلاح انتشار فقط ایجاد برنامه و انتشار بستهٔ اصلاحی را می‌پذیرد.')
     created, deployed = context['exists'], False
     for step in plan.steps:
@@ -137,6 +138,8 @@ class Assistant:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.cloud, self.planner = cloud, planner
         self.store = Store(self.data_dir / 'operations.sqlite')
+        self.vault = InputVault(self.data_dir)
+        self.observed_values = {}
         self.connection = sqlite3.connect(self.data_dir / 'checkpoints.sqlite', check_same_thread=False)
         self.checkpointer = SqliteSaver(self.connection)
         # ponytail: one local worker serializes runs; use per-run workers and PostgreSQL for multi-tenant hosting.
@@ -161,9 +164,28 @@ class Assistant:
     def _save(self, state, phase, text, **updates):
         state = dict(state, **updates)
         state['events'] = [*state.get('events', []), {'at': now(), 'phase': phase, 'text': text}]
-        state = redact(state, [self.cloud.token])
+        state = redact(state, self._secret_values(state['request']['project']))
         self.store.save(state['id'], state)
         return state
+
+    def _secret_values(self,project=None):
+        return [self.cloud.token,getattr(self.planner,'key',''),*self.vault.secrets(project),*(self.observed_values.get(project,[]) if project is not None else [value for values in self.observed_values.values() for value in values])]
+
+    def observe(self,project):
+        available=[]
+        try:
+            entries=self.cloud.project(project,raw=True).get('project',{}).get('envs',[])
+            available=[entry['key'] for entry in entries if entry.get('key') and entry.get('value')]
+            known=[entry['value'] for entry in entries if isinstance(entry.get('value'),str) and entry['value']]
+            self.observed_values[project]=list(set([*self.observed_values.get(project,[]),*known]))
+        except LiaraError:
+            pass
+        observations=self.cloud.observe(project)
+        observations['project']['configured_env']=available
+        return redact(observations,self._secret_values(project))
+
+    def _env_value(self,project,reference):
+        return self.vault.resolve(project,reference)
 
     def hosting_options(self):
         if getattr(self.cloud, 'local_lab', False):
@@ -186,12 +208,13 @@ class Assistant:
 
     def _prepare(self, state):
         request = state['request']
-        observations = self.cloud.observe(request['project'])
+        observations = self.observe(request['project'])
         for name, observation in observations.items():
             observation.update(id='before.' + name, collected_at=now(), source='Liara API', sha256=digest(observation))
         item = observations['project']
         exists = item['available']
         questions, inspection, artifact = [], {}, {}
+        missing_inputs, available_inputs, env_refs, candidates = [], [], {}, []
         if not exists and item.get('status') != 404:
             questions.append('اطلاعات برنامه قابل دریافت نیست؛ ابتدا دسترسی یا ارتباط لیارا را اصلاح کنید.')
         platform, port = request.get('platform'), request.get('port')
@@ -209,14 +232,26 @@ class Assistant:
             port = port or inspection['port']
             if not exists and not request['plan_id']:
                 questions.append('برای سایت جدید باید هزینهٔ میزبانی را انتخاب کنی؛ تا انتخاب و تأیید تو هیچ خریدی انجام نمی‌شود.')
-            artifact = snapshot(root, self.data_dir / 'artifacts', excluded_roots=(self.data_dir,))
+            source_values = read_source_env(root)
+            if source_values:
+                self.vault.put(request['project'],source_values,'env-file')
+            saved = self.vault.values(request['project'])
+            declared,candidates = discover_inputs(root,self._secret_values(request['project']),excluded_roots=(self.data_dir,))
+            host_names = set(item.get('configured_env',[]))
+            available_inputs = [{'name':name,'source':item['source']} for name,item in saved.items()]
+            available_inputs += [{'name':name,'source':'host'} for name in sorted(host_names-set(saved))]
+            missing_inputs = [input_label(name) for name in declared if name not in saved and name not in host_names]
+            env_refs = {name:self.vault.reference(request['project'],name) for name in saved}
+            artifact = snapshot(root, self.data_dir / 'artifacts', excluded_roots=(self.data_dir,),secrets=self._secret_values(request['project']))
         elif not exists:
             questions.append('برای این عملیات ابتدا برنامه‌ای موجود را انتخاب کنید.')
         context = {'observations': observations, 'exists': exists, 'inspection': inspection,
-                   'platform': platform, 'port': port, 'questions': questions}
+                   'platform': platform, 'port': port, 'questions': questions,
+                   'input_requests':missing_inputs,'available_inputs':available_inputs,
+                   'env_refs':env_refs,'configuration_candidates':candidates}
         context['hosting_options'] = self.hosting_options() if request['intent'] in {'deploy','repair','operate'} else []
         if request['intent'] in {'deploy','repair'} and artifact:
-            context['deployment_files'], context['omitted_files'] = deployment_files(artifact, [self.cloud.token])
+            context['deployment_files'], context['omitted_files'] = deployment_files(artifact, self._secret_values(request['project']))
             context['repair_scope'] = 'Deployment manifests and backend startup only; no UI/business logic. Dependencies install during build, never on the host.'
             context['setup_policy'] = 'Resolve runtime from these files. When PORT is freely configurable, choose an appropriate value and label it a configuration decision. Never ask the person for ports, frameworks or internal identifiers.'
         active=observations.get('releases',{}).get('data',{}).get('currentRelease')
@@ -227,8 +262,8 @@ class Assistant:
         return self._save(state, 'inspect', 'پروژه و شواهد اولیه بررسی شد.', context=context, artifact=artifact)
 
     def _plan(self, state):
-        if state['context']['questions']:
-            plan = Plan(summary='برای ادامه به اطلاعات یا دسترسی بیشتری نیاز است.', questions=state['context']['questions'])
+        if state['context']['questions'] or state['context'].get('input_requests'):
+            plan = Plan(summary='این اطلاعات برای اجرای سایت لازم است.', questions=state['context']['questions'],inputs=state['context'].get('input_requests',[]))
         elif state.get('supplied_plan') is not None:
             plan = Plan.model_validate(state['supplied_plan'])
         elif self.planner is None:
@@ -236,7 +271,24 @@ class Assistant:
                         limitations=['مدل داخلی تنظیم نشده؛ ابزار MCP می‌تواند طرح ارائه دهد.'])
         else:
             plan = self.planner.plan(state['request'], state['context'])
-        if not plan.questions:
+        if plan.inputs:
+            if plan.steps or any(not allowed_name(item.name) for item in plan.inputs):
+                raise ValueError('درخواست اطلاعات سایت معتبر نیست.')
+            available = {item['name'] for item in state['context'].get('available_inputs',[])}
+            inputs = [item.model_dump() for item in plan.inputs if item.name not in available]
+            if not inputs:
+                raise ValueError('اطلاعات خواسته‌شده از قبل موجود است؛ بررسی تازه لازم است.')
+            state = dict(state,context=dict(state['context'],input_requests=inputs))
+        if not plan.questions and not plan.inputs:
+            refs=state['context'].get('env_refs',{})
+            if refs and state['request']['intent'] in {'deploy','repair'}:
+                # Settings are part of the same reviewed plan, applied before the build.
+                steps=[step for step in plan.steps if step.action!='update_env']
+                explicit={key:value for step in plan.steps if step.action=='update_env' for key,value in step.args.get('env_refs',{}).items()}
+                insertion=1 if steps and steps[0].action=='create_app' else 0
+                steps.insert(insertion,Step(action='update_env',title='تنظیم اطلاعات لازم سایت',reason='استفاده از اطلاعات موجود یا واردشده برای همین سایت.',args={'env_refs':{**refs,**explicit}}))
+                plan=plan.model_copy(update={'steps':steps})
+        if not plan.questions and not plan.inputs:
             deployment = next((step for step in plan.steps if step.action in {'deploy','repair_deploy'}), None)
             if deployment:
                 context = dict(state['context'])
@@ -246,24 +298,23 @@ class Assistant:
                 state = dict(state, context=context)
         validate_plan(plan, state['context'], state['artifact'], state['request'])
         repair = {}
-        if not plan.questions:
+        if not plan.questions and not plan.inputs:
             step = next((step for step in plan.steps if step.action == 'repair_deploy'), None)
             if step:
                 artifact, repair = stage_repair(state['artifact'], step.args['files'],
                     state['context']['deployment_files'], self.data_dir / 'artifacts', [self.cloud.token])
                 state = dict(state, artifact=artifact)
-        if plan.questions:
+        if plan.questions or plan.inputs:
             status = 'needs_input'
         else:
             status = 'awaiting_approval' if plan.steps else 'observed'
-        serialized = redact(plan.model_dump(), [self.cloud.token])
+        serialized = redact(plan.model_dump(), self._secret_values(state['request']['project']))
         env_fingerprints = {}
         for step in plan.steps:
             if step.action == 'update_env':
                 for reference in step.args['env_refs'].values():
-                    if reference not in os.environ:
-                        raise ValueError('متغیر سرور تعریف نشده است: ' + reference)
-                    env_fingerprints[reference] = hashlib.sha256(os.environ[reference].encode()).hexdigest()
+                    value=self._env_value(state['request']['project'],reference)
+                    env_fingerprints[reference] = hashlib.sha256(value.encode()).hexdigest()
         fingerprint = digest({'request': state['request'], 'plan': serialized, 'artifact': state['artifact'],
                               'env_fingerprints': env_fingerprints})
         return self._save(state, 'plan', 'طرح و پیامدهای عملیات آماده است.', plan=serialized,
@@ -282,11 +333,14 @@ class Assistant:
             raise ValueError('اقدام بدون تأیید مجاز نیست.')
         plan = Plan.model_validate(state['plan'])
         validate_plan(plan, state['context'], state['artifact'], state['request'])
+        for reference,fingerprint in state.get('env_fingerprints',{}).items():
+            if hashlib.sha256(self._env_value(state['request']['project'],reference).encode()).hexdigest()!=fingerprint:
+                raise ValueError('اطلاعات سایت پس از پیشنهاد تغییر کرده است؛ پیشنهاد تازه بساز.')
         results = []
         for index, step in enumerate(plan.steps):
             try:
                 result = self._step(state, index, step)
-                results.append(redact(result, [self.cloud.token]))
+                results.append(redact(result, self._secret_values(state['request']['project'])))
                 state = self._save(state, 'execute', step.title + ' انجام شد.', results=results)
             except (LiaraError, ValueError, RuntimeError, OSError, KeyError, TypeError) as error:
                 message = str(error) if not isinstance(error, (KeyError, TypeError)) else 'پاسخ لیارا با قرارداد مورد انتظار مطابقت ندارد؛ وضعیت را پیش از تکرار بررسی کنید.'
@@ -297,7 +351,7 @@ class Assistant:
     def _step(self, state, index, step):
         name, args = state['request']['project'], step.args
         key = state['id'] + ':' + str(index)
-        once = lambda suffix, fn: self.store.write_once(key + ':' + suffix, lambda:redact(fn(),[self.cloud.token]))
+        once = lambda suffix, fn: self.store.write_once(key + ':' + suffix, lambda:redact(fn(),self._secret_values(name)))
         if step.action == 'create_app':
             return once('create', lambda: self.cloud.create(name, args['platform'], args['plan_id']))
         if step.action in {'deploy', 'redeploy', 'repair_deploy'}:
@@ -325,11 +379,10 @@ class Assistant:
         if step.action == 'update_env':
             changes = {}
             for variable, reference in args['env_refs'].items():
-                if reference not in os.environ:
-                    raise ValueError('متغیر سرور تعریف نشده است: ' + reference)
-                if hashlib.sha256(os.environ[reference].encode()).hexdigest() != state.get('env_fingerprints', {}).get(reference):
+                value=self._env_value(name,reference)
+                if hashlib.sha256(value.encode()).hexdigest() != state.get('env_fingerprints', {}).get(reference):
                     raise ValueError('مقدار محرمانه پس از آماده‌شدن طرح تغییر کرده است؛ طرح جدید بسازید.')
-                changes[variable] = os.environ[reference]
+                changes[variable] = value
             return once('env', lambda: self.cloud.update_env(name, changes))
         if step.action == 'attach_domain':
             result = once('domain', lambda: self.cloud.attach_domain(name, args['domain']))
@@ -346,7 +399,7 @@ class Assistant:
     def _verify(self, state):
         if state['status'] == 'needs_input':
             return state
-        after = self.cloud.observe(state['request']['project'])
+        after = self.observe(state['request']['project'])
         for key, observation in after.items():
             observation.update(id='after.' + key, collected_at=now(), source='Liara API', sha256=digest(observation))
         steps = state.get('plan', {}).get('steps', [])
@@ -452,7 +505,7 @@ class Assistant:
         state = {'id': run_id, 'request': request.model_dump(), 'supplied_plan': plan.model_dump() if plan else None,
                  'status': 'preparing', 'events': [], 'results': [],
                  'demo': getattr(self.planner, 'name', '') == 'offline-demo' or bool(getattr(self.cloud,'local_lab',False))}
-        state = redact(state, [self.cloud.token])
+        state = redact(state, self._secret_values(request.project))
         self.store.save(run_id, state)
         return state
 
@@ -507,6 +560,22 @@ class Assistant:
             state=self._verify(state)
             return self._save(state,'recheck','فقط وضعیت دوباره خوانده شد؛ هیچ اقدام نوشتنی تکرار نشد.')
 
+    def new_inputs(self,run_id,submission):
+        submission=InputValues.model_validate(submission)
+        with self.lock:
+            previous=self.get(run_id)
+            if previous['status']!='needs_input':
+                raise ValueError('این درخواست منتظر اطلاعات نیست.')
+            requested={item['name'] for item in previous['context'].get('input_requests',[])}
+            if not requested or set(submission.values)!=requested:
+                raise ValueError('فقط اطلاعات خواسته‌شده را کامل وارد کن.')
+            self.vault.put(previous['request']['project'],submission.values,'saved')
+            request=dict(previous['request'])
+            if submission.plan_id is not None:request['plan_id']=submission.plan_id
+            if submission.message:request['message']+='\n'+submission.message
+            state=self.new(RunRequest.model_validate(request))
+            return self._save(state,'inputs','اطلاعات سایت ذخیره شد؛ پیشنهاد تازه آماده می‌شود.',parent_id=run_id)
+
     def new_answer(self,run_id,answer):
         answer=Answer.model_validate(answer)
         previous=self.get(run_id)
@@ -523,7 +592,7 @@ class Assistant:
         return self.process(self.new_answer(run_id,answer)['id'])
 
     def report(self,run_id):
-        return redact(operation_report(self.get(run_id),self.store.actions(run_id)),[self.cloud.token])
+        return redact(operation_report(self.get(run_id),self.store.actions(run_id)),self._secret_values(self.get(run_id)['request']['project']))
 
     def new_repair(self, run_id):
         previous = self.get(run_id)

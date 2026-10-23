@@ -40,8 +40,22 @@ class Answer(StrictModel):
     plan_id: str | None = Field(default=None,max_length=100)
 
 
+class InputRequest(StrictModel):
+    name: str = Field(pattern=r'^[A-Za-z_][A-Za-z0-9_]{0,99}$')
+    label: str = Field(min_length=1,max_length=120)
+    hint: str = Field(default='',max_length=300)
+    kind: Literal['secret','text','connection'] = 'secret'
+
+
+class InputValues(StrictModel):
+    values: dict[str,str] = Field(min_length=1,max_length=100)
+    message: str = Field(default='',max_length=3000)
+    plan_id: str | None = Field(default=None,max_length=100)
+
+
 class Plan(StrictModel):
     summary: str = Field(min_length=1, max_length=6000)
+    inputs: list[InputRequest] = Field(default_factory=list,max_length=50)
     evidence: list[str] = Field(default_factory=list, max_length=30)
     limitations: list[str] = Field(default_factory=list, max_length=30)
     questions: list[str] = Field(default_factory=list, max_length=15)

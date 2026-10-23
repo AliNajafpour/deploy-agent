@@ -141,6 +141,10 @@ class RepairBuilder(DemoCloud):
             before=expected.pop('server.mjs').decode('utf8').replace('\r\n','\n')
             after=files.pop('server.mjs').decode('utf8').replace('\r\n','\n')
             assert after in {before, before.replace('"127.0.0.1"','"0.0.0.0"')}, 'Only startup bind host may also be corrected'
+        if self.fixture=='02-missing-package' and files != expected:
+            before=expected.pop('app.py').decode('utf8').replace('\r\n','\n')
+            after=files.pop('app.py').decode('utf8').replace('\r\n','\n')
+            assert after in {before,before.replace('HTTPServer(("127.0.0.1",','HTTPServer(("0.0.0.0",')}, 'Only startup bind may also be corrected'
         assert files==expected, 'Backend source must remain unchanged in these checks' 
 
     def handle(self, request):

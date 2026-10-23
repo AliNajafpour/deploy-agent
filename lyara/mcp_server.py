@@ -28,16 +28,19 @@ def create_mcp(assistant):
         """Read bounded, non-secret startup/manifests from a local immutable snapshot; no code execution."""
         from .project import snapshot
         from .repair import deployment_files
-        artifact = snapshot(workspace_path(assistant.workspace, source), assistant.data_dir / 'artifacts',
-                            excluded_roots=(assistant.data_dir,))
-        files, omitted = deployment_files(artifact, [assistant.cloud.token])
+        from .inputs import read_source_env
+        root=workspace_path(assistant.workspace,source)
+        secrets=[*assistant._secret_values(),*read_source_env(root).values()]
+        artifact = snapshot(root, assistant.data_dir / 'artifacts',
+                            excluded_roots=(assistant.data_dir,),secrets=secrets)
+        files, omitted = deployment_files(artifact, secrets)
         return {'files': files, 'omitted': omitted, 'archive_sha256': artifact['sha256']}
 
     @server.tool(annotations=read)
     def collect_evidence(project: str) -> dict:
         """Collect redacted logs, releases, events, CPU/memory; report unavailable data explicitly."""
         RunRequest(message='observe', project=project)
-        return assistant.cloud.observe(project)
+        return assistant.observe(project)
 
     @server.tool(annotations=read)
     def list_domains(project: str) -> dict:

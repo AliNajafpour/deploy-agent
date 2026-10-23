@@ -53,7 +53,7 @@ def check_project(fixture, provider):
                 actual=[step['action'] for step in run.get('plan',{}).get('steps',[])]
                 if allow_env_question and run['status']=='needs_input':
                     required='APP_GREETING' if fixture=='04-missing-env' else 'WORKER_ENABLED'
-                    assert actual==[] and required in json.dumps(run['plan']['questions'])
+                    assert actual==[] and (required in json.dumps(run['plan']['questions']) or required in {item['name'] for item in run['context'].get('input_requests',[])})
                     print(f'  {fixture}: model asks for environment choice',flush=True)
                     return run
                 assert actual==list(actions),f'Unexpected actions: {actual}, expected {list(actions)}; status={run["status"]}'
@@ -76,15 +76,22 @@ def check_project(fixture, provider):
             run=request(message,intent='deploy',source=fixture,port=port,actions=actions,
                         allow_env_question=fixture in {'04-missing-env','08-worker-sqlite'})
             if fixture=='04-missing-env' and run['status']=='needs_input':
-                record['checks']['model_asked_environment_choice_without_mutation']=True
-                run=request('در پاسخ به سؤال APP_GREETING: برای بازتولید خرابی در این برنامهٔ آزمایشی، عمداً فعلاً این متغیر را تنظیم نکن. فقط ساخت برنامه و انتشار سورس را پیشنهاد بده و پیش از اجرا تأیید بگیر.',
-                            intent='deploy',source=fixture,port=port,actions=actions,answer_to=run['id'])
+                record['checks']['typed_configuration_requested_without_mutation']=True
+                before=len(cloud.mutations)
+                state=service.new_inputs(run['id'],{'values':{'APP_GREETING':'Hello actual agent lab'}})
+                run=service.process(state['id'])
+                assert run['status']=='awaiting_approval',run.get('error')
+                assert len(cloud.mutations)==before
+                phase={'request':'Provide requested configuration through the secure form','proposal':run,'decision':'approve'}
+                run=service.approve(run['id'],run['plan_digest'],True)
+                phase['result']=run
+                record['phases'].append(phase)
             elif fixture=='08-worker-sqlite' and run['status']=='needs_input':
                 record['checks']['model_asked_worker_configuration_without_mutation']=True
                 run=request('در پاسخ به سؤال WORKER_ENABLED: از پیش‌فرض داخلی برنامه برای فعال‌بودن worker استفاده کن. فعلاً هیچ متغیر محیطی تنظیم نکن؛ فقط ساخت برنامه و انتشار سورس را برای تأیید پیشنهاد بده.',
                             intent='deploy',source=fixture,port=port,actions=actions,answer_to=run['id'])
             expected=('failed' if fixture in {'06-startup-crash','07-wrong-port'} else
-                      'needs_attention' if fixture in {'04-missing-env','05-http500','09-restart-approval'} else 'completed')
+                      'needs_attention' if fixture in {'05-http500','09-restart-approval'} else 'completed')
             assert run['status']==expected,f'Deployment status {run["status"]}, expected {expected}; error={run.get("error")}'
             record['checks']['deployment_outcome_correct']=True
 
@@ -100,12 +107,8 @@ def check_project(fixture, provider):
                 assert run['context']['port']==3000 and not run['plan']['questions']
                 record['checks']['automatic_settings_led_to_healthy_deploy']=True
             elif fixture=='04-missing-env':
-                assert cloud.fetch(name,'/health').status_code==503
-                run=request('سرویس سالم بالا نیامده است؛ لاگ و سلامت را بررسی کن. اگر APP_GREETING لازم است، مقدارش را از ارجاع سرور LYARA_DEPLOY_APP_GREETING بگیر، تنظیمش کن و سپس یک بار ری‌استارت کن. قبل از تغییر تأیید بگیر.',actions=['update_env','restart'])
-                assert run['status']=='needs_attention' and run['verification']['health']['healthy']
-                assert next(c for c in run['verification']['action_checks'] if c['action']=='restart')['matched'] is None
                 assert cloud.fetch(name,'/health').json()['greeting']=='Hello actual agent lab'
-                record['checks']['model_configuration_repair_and_real_health']=True
+                record['checks']['typed_configuration_and_real_health']=True
             elif fixture in {'05-http500','06-startup-crash','07-wrong-port'}:
                 run=request('علت مشکل همین انتشار را فقط از شواهد بررسی کن. فعلاً هیچ تغییر یا اقدام اجرایی پیشنهاد نده.',intent='diagnose')
                 text=json.dumps(run['plan'],ensure_ascii=False).lower()

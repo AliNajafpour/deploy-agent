@@ -6,12 +6,13 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import Field
 
 from .liara import LiaraError
-from .models import Answer, RunRequest, StrictModel
+from .models import Answer, InputValues, RunRequest, StrictModel
 from .presentation import report_markdown
 from .project import list_sources
 
@@ -51,6 +52,11 @@ def create_app(assistant, access_token='', allowed_hosts=None):
         response.headers['Cache-Control'] = 'no-store'
         return response
 
+    @app.exception_handler(RequestValidationError)
+    async def invalid_body(request,error):
+        # Validation errors must never echo submitted credentials.
+        return JSONResponse({'detail':'اطلاعات واردشده کامل یا معتبر نیست.'},status_code=422)
+
     @app.exception_handler(ValueError)
     async def invalid(request, error):
         return JSONResponse({'detail': str(error)}, status_code=400)
@@ -84,7 +90,7 @@ def create_app(assistant, access_token='', allowed_hosts=None):
     @app.get('/api/projects/{name}/evidence')
     def evidence(name: str):
         RunRequest(message='observe', project=name)
-        return assistant.cloud.observe(name)
+        return assistant.observe(name)
 
     @app.get('/api/runs')
     def runs():
@@ -103,6 +109,12 @@ def create_app(assistant, access_token='', allowed_hosts=None):
     @app.post('/api/runs/{run_id}/answer',status_code=202)
     def answer(run_id:str,answer:Answer):
         state=assistant.new_answer(run_id,answer)
+        executor.submit(assistant.process,state['id'])
+        return state
+
+    @app.post('/api/runs/{run_id}/inputs',status_code=202)
+    def inputs(run_id:str,submission:InputValues):
+        state=assistant.new_inputs(run_id,submission)
         executor.submit(assistant.process,state['id'])
         return state
 

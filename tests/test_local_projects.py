@@ -74,23 +74,19 @@ class LocalProjectChecks(unittest.TestCase):
         result = self.deploy('03-missing-port', port=3000)
         self.assertEqual(result['status'], 'completed')
 
-    def test_missing_env_requires_approved_configuration_and_restart(self):
-        first = self.deploy('04-missing-env')
-        self.assertEqual(first['status'], 'needs_attention')
-        self.assertEqual(self.cloud.fetch('fixture-app', '/health').status_code, 503)
-        before = len(self.cloud.mutations)
-        with patch.dict(os.environ, {'LYARA_DEPLOY_APP_GREETING':'Hello local lab'}):
-            plan = Plan(summary='Supply missing config and restart', steps=[
-                {'action':'update_env','title':'Configure','reason':'APP_GREETING missing in logs',
-                 'args':{'env_refs':{'APP_GREETING':'LYARA_DEPLOY_APP_GREETING'}}},
-                {'action':'restart','title':'Restart','reason':'Load approved environment','args':{}}])
-            proposed = self.service.start(RunRequest(message='Use the server-side greeting reference', project='fixture-app',intent='operate'), plan)
-            self.assertEqual(proposed['status'],'awaiting_approval')
-            self.assertEqual(len(self.cloud.mutations),before)
-            result = self.service.approve(proposed['id'],proposed['plan_digest'],True)
-        self.assertEqual(result['status'],'needs_attention')
-        self.assertTrue(result['verification']['health']['healthy'])
-        self.assertIsNone(next(item for item in result['verification']['action_checks'] if item['action']=='restart')['matched'])
+    def test_missing_env_is_collected_in_ui_then_applied_only_after_approval(self):
+        from tests.lab import LabPlanner
+        first=self.deploy('04-missing-env')
+        self.assertEqual(first['status'],'needs_input')
+        self.assertEqual(self.cloud.mutations,[])
+        self.assertEqual(self.cloud.process_count,0)
+        self.service.planner=LabPlanner()
+        state=self.service.new_inputs(first['id'],{'values':{'APP_GREETING':'Hello local lab'}})
+        proposed=self.service.process(state['id'])
+        self.assertEqual(proposed['status'],'awaiting_approval')
+        self.assertEqual(self.cloud.mutations,[])
+        result=self.service.approve(proposed['id'],proposed['plan_digest'],True)
+        self.assertEqual(result['status'],'completed',result.get('error'))
         self.assertEqual(self.cloud.fetch('fixture-app','/health').json()['greeting'],'Hello local lab')
 
     def test_real_stack_trace_and_http500_are_available_as_evidence(self):

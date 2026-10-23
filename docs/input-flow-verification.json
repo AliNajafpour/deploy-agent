@@ -1,0 +1,34 @@
+{
+  "date": "2026-10-23",
+  "configured_model": "openai/gpt-6-luna",
+  "provider": "BoxAPI",
+  "cloud": "local simulation; no live Liara account used",
+  "unit_checks": 105,
+  "additional_repair_guard_check": "passed",
+  "ui_check": "Node consequence/DOM checks passed; browser key/database form, cleared inputs, compact approval and completed real local deployment inspected",
+  "simple": {
+    "fixture": "04-missing-env",
+    "model": "openai/gpt-6-luna",
+    "passed": true,
+    "typed_input": true,
+    "fresh_approval": true,
+    "actions": [
+      "create_app",
+      "update_env",
+      "deploy"
+    ],
+    "actual_http": 200,
+    "report_contains_value": false,
+    "final_status": "completed"
+  },
+  "hard": {
+    "fixture": "02-missing-package",
+    "passed": true,
+    "execution": "real local HTTP 200",
+    "original_source_preserved": true,
+    "model_response": "actual Luna response, unchanged replay",
+    "initial_attempt": "test guard rejected an allowed bind-address correction; guard amended to accept only that exact startup correction and reject response changes",
+    "replay_after_guard_fix": true
+  },
+  "ui_network_note": "One browser retry saw a transient BoxAPI connection failure; a fresh request returned an approval proposal. No write was approved for the failed attempt."
+}

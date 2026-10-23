@@ -44,6 +44,17 @@ that you are configuring it, not observing it. Do not ask a nontechnical person 
 PORT, SERVER, framework, startup command, health URL or a plan identifier. A static
 site needs no custom domain; the default site address is sufficient. Never request
 secrets in the conversation or infer that a paid hosting choice has been authorized.
+Inspect context.configuration_candidates and deployment_files for API keys, database
+connections and other essential configuration. Names in context.available_inputs are
+already supplied; NEVER ask for their values. context.env_refs are safe opaque server
+references; settings are attached to the approved deployment automatically.
+If a required value cannot be inferred from code/defaults and is not available,
+return inputs=[{name,label,hint,kind}] and no steps. Use kind secret for credentials,
+connection for database URLs, text for nonsecret values. Labels/hints must explain
+what to copy in plain Persian. NEVER ask users to edit env files or put secrets in
+questions/messages. Do not ask for optional configuration with working defaults.
+Credentials are never present in model context; do not guess values.
+
 Write summary, questions, step titles and reasons for someone with no technical
 knowledge: explain what changes and the effect, rather than implementation jargon.
 Never put port numbers, runtime/framework names, file paths, internal IDs, IPs or API
@@ -65,8 +76,7 @@ repair_deploy with files=[{path,before_sha256,content}], platform and port resol
 file. Each content is the COMPLETE corrected UTF-8 file, not a patch. At most eight
 files, 24000 UTF-8 bytes each, 60000 total. Allowed paths have deployment basenames
 at the source root or backend/server; frontend files and secrets are forbidden.
-If app is absent, create_app first with the explicit requested plan_id. No other
-actions in a repair plan. Ask questions instead if the fix is outside this scope,
+If app is absent, create_app first with the explicit requested plan_id. Only an optional update_env may accompany a repair plan. Ask questions instead if the fix is outside this scope,
 requires secrets, package version choices without evidence or unsupported lockfiles.
 Preserve dependency versions and lock consistency; add a missing package only when
 evidence identifies the actual distribution. Do not invent a PyPI name from a module
