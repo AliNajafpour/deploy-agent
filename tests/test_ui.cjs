@@ -23,6 +23,7 @@ assert.equal(ids.length,new Set(ids).size,'IDs are unique');
 for(const [,id] of js.matchAll(/\$\('([^']+)'\)/g))assert.ok(ids.includes(id),`JS target exists: ${id}`);
 assert.ok(html.indexOf('id="approval"')<html.indexOf('id="change-review"'),'approval precedes plan review');
 assert.ok(!/sidebar|id="welcome"|demo-banner/.test(html),'removed filler does not return');
+assert.ok(!/access-token|save-access|کد ورود/.test(html+js),'there is no entry-code form or automatic login prompt');
 assert.ok(!/lab-project|lab-catalog|source-picker|source-manual|manual-source/.test(html),'upload replaces fixture and server path controls');
 assert.ok(!/samples|lab_projects|local_lab|config\.demo|selectLabProject|آزمایشی/.test(js+html),'no sample sites or simulated hosting in product UI');
 assert.match(html, /id="site-upload" type="file" accept="\.zip,application\/zip"/);

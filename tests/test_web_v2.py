@@ -20,6 +20,20 @@ class WebV2Checks(unittest.TestCase):
     def tearDown(self):
         self.app.state.monitoring.close();self.web.close();self.assistant.close();self.temporary.cleanup()
 
+    def test_public_mode_needs_no_code_but_retains_origin_and_generation_checks(self):
+        public=create_app(self.assistant,'',{'testserver'})
+        try:
+            with TestClient(public) as client:
+                response=client.get('/api/controls')
+                self.assertEqual(response.status_code,200)
+                generation=response.json()['generation']
+                self.assertEqual(client.put('/api/controls',headers={'Origin':'https://outside.example'},
+                    json={'enabled':True,'expected_generation':generation}).status_code,403)
+                self.assertEqual(client.put('/api/controls',json={'enabled':True,'expected_generation':generation}).status_code,200)
+                self.assertEqual(client.put('/api/controls',json={'enabled':False,'expected_generation':generation}).status_code,403)
+            self.assertEqual(self.cloud.mutations,[])
+        finally:public.state.monitoring.close()
+
     def test_new_controls_and_handoffs_are_authenticated_and_same_origin(self):
         with patch.object(self.assistant,'controls',create=True,return_value={'stopped':False,'generation':0,'managed_projects':[]}) as controls:
             for path in ['/api/controls','/api/hosting','/api/runs/unknown/handoff']:

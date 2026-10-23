@@ -64,7 +64,7 @@ def create_app(assistant, access_token='', allowed_hosts=None):
             return JSONResponse({'detail': 'میزبان این درخواست مجاز نیست.'}, status_code=403)
         if request.url.path.startswith('/api/'):
             if access_token and not hmac.compare_digest(request.headers.get('authorization', ''), 'Bearer ' + access_token):
-                return JSONResponse({'detail': 'توکن دسترسی رابط را وارد کنید.'}, status_code=401)
+                return JSONResponse({'detail': 'دسترسی این نشست تأیید نشده است.'}, status_code=401)
             origin = request.headers.get('origin')
             if origin and urlsplit(origin).netloc != request.headers.get('host'):
                 return JSONResponse({'detail': 'درخواست از سایت دیگر مجاز نیست.'}, status_code=403)

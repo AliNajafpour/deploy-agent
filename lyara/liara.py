@@ -131,6 +131,8 @@ class LiaraClient:
 
     def wait_release(self, name, release_id, timeout=180, interval=3, progress=None):
         deadline = time.monotonic() + timeout
+        build_since=None
+        build_rows=[]
         while True:
             data = self.releases(name,timeout=min(12,max(0.1,deadline-time.monotonic())))
             release = next((r for r in data.get('releases', []) if r.get('_id') == release_id), None)
@@ -141,7 +143,23 @@ class LiaraClient:
                 try:detail=self.release_status(release_id,timeout=min(12,max(0.1,deadline-time.monotonic()))).get('release',{})
                 except LiaraError:pass
                 try:
-                    build=self.build_logs(release_id,timeout=min(12,max(0.1,deadline-time.monotonic())))
+                    # The live API pages at 20 rows; advance its timestamp cursor.
+                    for _ in range(3):
+                        previous=build_since
+                        build=self.build_logs(release_id,since=build_since,timeout=min(12,max(0.1,deadline-time.monotonic())))
+                        rows=build.get('buildOutput',[])
+                        if not isinstance(rows,list):break
+                        for row in rows[:100]:
+                            if not isinstance(row,dict):continue
+                            clean={k:str(row.get(k,''))[:2000] for k in ['line','stream','createdAt']}
+                            if clean not in build_rows:build_rows.append(clean)
+                            stamp=clean['createdAt']
+                            try:datetime.fromisoformat(stamp.replace('Z','+00:00'))
+                            except ValueError:continue
+                            if build_since is None or stamp>build_since:build_since=stamp
+                        build_rows=build_rows[-100:]
+                        if len(rows)<20 or build_since==previous or time.monotonic()>=deadline:break
+                    build['buildOutput']=list(build_rows)
                 except LiaraError as error:
                     build={'available':False,'error':str(error)}
                 if isinstance(build.get('buildOutput'),list):

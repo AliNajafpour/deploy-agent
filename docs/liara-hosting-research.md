@@ -41,7 +41,8 @@ python -m lyara serve --host 0.0.0.0 --port 8080
 | `LYARA_LLM_API_KEY` | کلید واقعی BoxAPI؛ دسترسی و مدل باید جداگانه در حساب فراهم باشند |
 | `LIARA_API_TOKEN` | کلید API حسابی که سایت‌ها را منتشر می‌کند |
 | `LIARA_TEAM_ID` | شناسهٔ تیم هدف؛ برای حساب شخصی خالی |
-| `LYARA_ACCESS_TOKEN` | مقدار تصادفی قوی برای ورود به وب دستیار؛ اجرای غیرمحلی بدون آن رد می‌شود |
+| `LYARA_ACCESS_TOKEN` | کلید Bearer برای API خصوصی؛ در حالت `LYARA_PUBLIC_ACCESS=true` اعمال نمی‌شود |
+| `LYARA_PUBLIC_ACCESS` | مقدار صریح `true` برای دسترسی همه بدون کد ورود؛ عملیات و اعتبار حساب پیکربندی‌شده در اختیار همهٔ بازدیدکنندگان قرار می‌گیرد |
 | `LYARA_PUBLIC_HOST` | فقط hostname، مثلاً `YOUR_LYARA_APP_ID.liara.run`؛ بدون `https://` یا مسیر |
 | `LYARA_WORKSPACE` | `/workspace`؛ پوشهٔ خالی مستقل از کد خود دستیار، پیش‌فرض Dockerfile |
 | `LYARA_DATA_DIR` | `/data`؛ محل پایدار وضعیت خصوصی و فایل‌های آپلودشده، پیش‌فرض Dockerfile |

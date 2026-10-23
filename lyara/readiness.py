@@ -93,8 +93,10 @@ def check_readiness(env_file=None, environ=None, production=False):
         'LIARA_API_TOKEN must contain a token, without whitespace or unresolved placeholders. Account access is not tested.')
     token = env.get('LYARA_ACCESS_TOKEN', '')
     strong = credential('LYARA_ACCESS_TOKEN') and len(token) >= 32 and len(set(token)) >= 8
-    add('access_token', 'pass' if strong else ('error' if production else 'warning'), 'Web access token',
-        'Use a randomly generated LYARA_ACCESS_TOKEN of at least 32 characters for public hosting. Randomness cannot be verified offline.')
+    public_access=env.get('LYARA_PUBLIC_ACCESS','').lower()=='true'
+    add('access_token', 'warning' if public_access else ('pass' if strong else ('error' if production else 'warning')), 'Web access',
+        'Public access is explicit: every visitor can use the team operations and credit.' if public_access else
+        'Use a randomly generated LYARA_ACCESS_TOKEN of at least 32 characters for private hosting. Randomness cannot be verified offline.')
     hostname = env.get('LYARA_PUBLIC_HOST', '')
     try:
         host = hostname.encode('idna').decode('ascii')

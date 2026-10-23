@@ -73,6 +73,15 @@ class ReadinessChecks(unittest.TestCase):
                 self.assertEqual(statuses['public_host'], 'error')
                 self.assertEqual(statuses['access_token'], 'error')
 
+    def test_explicit_public_access_does_not_require_an_entry_code(self):
+        self.env['LYARA_ACCESS_TOKEN']=''
+        self.env['LYARA_PUBLIC_ACCESS']='true'
+        report=self.check(production=True)
+        self.assertTrue(report['ready'])
+        self.assertEqual(self.statuses(report)['access_token'],'warning')
+        self.env['LYARA_PUBLIC_ACCESS']='false'
+        self.assertEqual(self.statuses(self.check(production=True))['access_token'],'error')
+
     def test_api_url_is_checked_without_requests(self):
         for url in ['http://example.com/v1', 'https://user:pass@example.com/v1', 'https://example.com/?key=secret', 'https://[invalid']:
             with self.subTest(url=url):

@@ -98,9 +98,10 @@ def main():
         if args.command == 'serve':
             import uvicorn
             from .web import create_app
-            token = os.getenv('LYARA_ACCESS_TOKEN', '')
-            if args.host not in {'127.0.0.1', 'localhost', '::1'} and not token:
-                raise ValueError('برای دسترسی غیرمحلی LYARA_ACCESS_TOKEN را تنظیم کنید.')
+            public_access=os.getenv('LYARA_PUBLIC_ACCESS','').lower()=='true'
+            token = '' if public_access else os.getenv('LYARA_ACCESS_TOKEN', '')
+            if args.host not in {'127.0.0.1', 'localhost', '::1'} and not token and not public_access:
+                raise ValueError('LYARA_ACCESS_TOKEN یا حالت عمومی صریح LYARA_PUBLIC_ACCESS=true را تنظیم کنید.')
             hosts = {'127.0.0.1', 'localhost', '::1'}
             if os.getenv('LYARA_PUBLIC_HOST'):
                 hosts.add(os.environ['LYARA_PUBLIC_HOST'].encode('idna').decode('ascii').lower())

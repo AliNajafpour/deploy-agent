@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-23",
+  "project": "lyara-agent-b1bb00",
+  "url": "https://lyara-agent-b1bb00.liara.run",
+  "release_id": "6adba76a72aa39a87ac2d27d",
+  "source_sha256": "16855ead5ca4821931bc83372e18085e0263f8d109bd37dea982635db3606b00",
+  "public_access": true,
+  "code_form": false,
+  "http_checks_passed": 18,
+  "active_release_checks": [
+    "6adba76a72aa39a87ac2d27d",
+    "6adba76a72aa39a87ac2d27d",
+    "6adba76a72aa39a87ac2d27d",
+    "6adba76a72aa39a87ac2d27d"
+  ],
+  "median_response_ms": 171.5,
+  "disk": {
+    "name": "data",
+    "size_gb": 1,
+    "mounted_to": "/data",
+    "api_verified": true
+  },
+  "tests": {
+    "python_passed": 288,
+    "duration_seconds": 121.376,
+    "node_ui": "passed"
+  },
+  "model": "openai/gpt-6-luna",
+  "provider": "BoxAPI",
+  "extra_live_model_requests": 0,
+  "rollout_note": "The initial immediate GET still returned the previous UI; final verification waited for the new source and repeated all checks.",
+  "browser": {
+    "public_ui_rendered": true,
+    "entry_code_form": false,
+    "screenshot": "live-deployment.png"
+  }
+}

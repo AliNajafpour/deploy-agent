@@ -2,6 +2,7 @@ import asyncio
 import contextlib
 import io
 import json
+import os
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -12,6 +13,16 @@ from lyara.mcp_server import create_mcp
 
 
 class CliMcpTests(unittest.TestCase):
+    def test_public_web_access_requires_explicit_operator_setting(self):
+        with patch.dict(os.environ,{'LYARA_PUBLIC_ACCESS':'true','LYARA_ACCESS_TOKEN':'old-private-token'}), \
+             patch('lyara.web.create_app',return_value=object()) as app,patch('uvicorn.run') as run:
+            self.assertEqual(self.invoke(['serve','--host','0.0.0.0'])[0],0)
+            self.assertEqual(app.call_args.args[1],'')
+            run.assert_called_once()
+        with patch.dict(os.environ,{'LYARA_PUBLIC_ACCESS':'false','LYARA_ACCESS_TOKEN':''}),patch('uvicorn.run') as run:
+            self.assertEqual(self.invoke(['serve','--host','0.0.0.0'])[0],1)
+            run.assert_not_called()
+
     def setUp(self):
         self.service = SimpleNamespace(
             controls=Mock(return_value={'stopped': True, 'generation': 7, 'managed_projects': []}),

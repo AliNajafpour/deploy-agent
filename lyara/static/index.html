@@ -10,7 +10,7 @@
     <nav class="site-nav" aria-label="انتخاب سایت"><select id="projects" aria-label="سایت‌های من"><option value="">سایت جدید</option></select><button id="new-project" class="text-button">+ جدید</button></nav>
     <span id="hosting-status" class="environment" hidden></span>
     <button id="emergency-toggle" class="emergency-button" type="button" hidden>توقف تغییرات</button>
-    <button class="text-button access-button" id="access-button" aria-label="ورود و اطلاعات اتصال"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg><span id="connection">اتصال…</span></button>
+    <button class="text-button access-button" id="access-button" aria-label="اطلاعات اتصال"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg><span id="connection">اتصال…</span></button>
   </header>
   <main class="workspace">
     <div class="workspace-top"><select id="history" aria-label="درخواست‌های قبلی" hidden></select></div>
@@ -54,6 +54,6 @@
       <p id="watch-status" class="muted" role="status"></p><div id="incidents"></div>
     </section>
   </main>
-  <dialog id="access-dialog"><form method="dialog"><div class="dialog-heading"><h2>اتصال به برنامه</h2><button class="text-button" aria-label="بستن">×</button></div><label>کد ورود<input id="access-token" type="password" autocomplete="current-password" dir="ltr"></label><button id="save-access" class="primary" value="save">ورود</button><details class="connection-details"><summary>اطلاعات اتصال</summary><pre id="configuration" dir="ltr"></pre><div id="management-controls" hidden><p id="management-status" class="muted"></p><button type="button" id="manage-toggle" class="quiet">اجازهٔ مدیریت این سایت</button></div><button type="button" id="refresh" class="quiet">تازه‌سازی سایت‌ها</button></details></form></dialog>
+  <dialog id="access-dialog"><form method="dialog"><div class="dialog-heading"><h2>اطلاعات اتصال</h2><button class="text-button" aria-label="بستن">×</button></div><details class="connection-details"><summary>اطلاعات اتصال</summary><pre id="configuration" dir="ltr"></pre><div id="management-controls" hidden><p id="management-status" class="muted"></p><button type="button" id="manage-toggle" class="quiet">اجازهٔ مدیریت این سایت</button></div><button type="button" id="refresh" class="quiet">تازه‌سازی سایت‌ها</button></details></form></dialog>
 </body>
 </html>
