@@ -1,0 +1,1 @@
+{"name":"local-wrong-port","private":true,"scripts":{"start":"node server.mjs"}}

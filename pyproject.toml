@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lyara-assistant"
+version = "0.1.0"
+description = "Checkpointed deployment and operations assistant for Liara"
+requires-python = ">=3.11"
+dynamic = ["dependencies"]
+
+[project.scripts]
+lyara = "lyara.cli:main"
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+include = ["lyara*"]
+
+[tool.setuptools.package-data]
+lyara = ["static/*"]

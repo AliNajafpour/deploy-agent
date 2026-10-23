@@ -1,0 +1,1 @@
+{"name":"local-broken-startup","private":true,"scripts":{"start":"node server.mjs"}}

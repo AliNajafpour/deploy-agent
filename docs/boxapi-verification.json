@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-23",
+  "provider": "BoxAPI",
+  "base_url": "https://ai.boxapi.ir/ai/v1",
+  "requested_model": "openai/gpt-6-luna",
+  "confirmed_response_model": "openai/gpt-6-luna",
+  "cloud_api": "local simulation; no live Liara account used",
+  "scenarios": [
+    {
+      "difficulty": "simple",
+      "fixture": "01-static",
+      "passed": true,
+      "checks": {
+        "deployment_outcome_correct": true,
+        "actual_static_content": true,
+        "all_child_processes_stopped": true
+      }
+    },
+    {
+      "difficulty": "hard",
+      "fixture": "02-missing-package",
+      "passed": true,
+      "baseline_healthy": false,
+      "verified_http_status": 200,
+      "repair": "Luna added colorama==0.4.6 to requirements.txt; backend source preserved",
+      "dependency_installation": "existing uv cache, offline, disposable virtual environment",
+      "human_approval": "test operator approved the exact candidate before upload",
+      "recheck": "Unmodified saved Luna proposal replayed after fixing a missing wheelhouse path in the test builder."
+    }
+  ],
+  "other_scenarios_rerun": false,
+  "hard_initial_failure": "Missing local wheelhouse, resolved by offline uv cache fallback",
+  "reproduce": [
+    "python -m tests.agent_projects --provider api --case 01-static",
+    "python -m tests.repair_agent --provider api --fixture 02-missing-package"
+  ]
+}

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>لیارا، از پروژه تا انتشار</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="لیارا، صفحهٔ اصلی"><span class="brand-mark">لـ</span><span>لیارا<span class="brand-caption">همکار انتشار و نگهداری</span></span></a>
+    <div class="connection"><span class="status-dot"></span><span id="connection">در حال اتصال</span></div>
+    <button class="quiet" id="access-button">دسترسی و اتصال</button>
+  </header>
+  <div id="demo-banner" class="demo-banner" hidden>محیط آزمایشی آفلاین · عملیات و داده‌ها شبیه‌سازی می‌شوند و حساب واقعی تغییری نمی‌کند.</div>
+  <main class="workspace">
+    <aside class="sidebar">
+      <div class="section-title"><h2>برنامه‌های شما</h2><button id="refresh" class="icon-button" aria-label="تازه‌سازی برنامه‌ها">↻</button></div>
+      <div id="projects" class="project-list"><p class="muted">فهرست برنامه‌ها دریافت می‌شود…</p></div>
+      <button id="new-project" class="new-project">+ انتشار پروژهٔ جدید</button>
+      <div class="sidebar-note"><span class="small-label">کنترل با شماست</span><p>قبل از هر تغییر، طرح و پیامدهای آن را می‌بینید. تأیید شما فقط برای همان طرح معتبر است.</p></div>
+      <div class="section-title history-title"><h2>عملیات اخیر</h2></div>
+      <div id="history" class="history"><p class="muted">هنوز عملیاتی ثبت نشده.</p></div>
+      <a class="docs-link" href="https://developers.liara.ir" target="_blank" rel="noreferrer">مستندات رسمی لیارا ↗</a>
+    </aside>
+    <section class="desk">
+      <div class="desk-heading"><div><span class="eyebrow">از کد تا یک سایت سالم</span><h1>انتشار را با هم جلو ببریم.</h1><p>پروژه را انتخاب کنید؛ مراحل، شواهد و نتیجه همین‌جا روشن می‌مانند.</p></div><span class="workspace-pill" id="provider">—</span></div>
+      <div class="mode-switch" role="group" aria-label="نوع درخواست">
+        <button data-mode="deploy" class="selected" aria-pressed="true">انتشار پروژه</button>
+        <button data-mode="repair" aria-pressed="false">رفع مانع انتشار</button>
+        <button data-mode="diagnose" aria-pressed="false">بررسی مشکل</button>
+        <button data-mode="operate" aria-pressed="false">مدیریت سرویس</button>
+        <button data-mode="monitor" aria-pressed="false">پایش سلامت</button>
+      </div>
+      <label id="lab-catalog" hidden>پروژهٔ آزمایشی محلی<select id="lab-project"></select></label>
+      <form id="request-form" class="request-form">
+        <div class="form-row"><label>نام برنامه<input id="project" required pattern="[a-z0-9][a-z0-9-]{0,62}" placeholder="my-website" dir="ltr" autocomplete="off"></label><label class="deploy-field">پوشهٔ پروژه<input id="source" value="." dir="ltr" autocomplete="off"><span class="field-hint">نسبت به فضای کاری سرور</span></label></div>
+        <div class="form-row deploy-field"><label>شناسهٔ پلن<input id="plan" placeholder="برای برنامهٔ جدید لازم است" dir="ltr"></label><label>پورت برنامه<input id="port" type="number" min="1" max="65535" placeholder="3000" dir="ltr"></label><label>پلتفرم<select id="platform"><option value="">تشخیص از پروژه</option><option value="node">Node.js</option><option value="docker">Docker</option><option value="python">Python</option><option value="django">Django</option><option value="flask">Flask</option><option value="next">Next.js</option><option value="static">Static</option><option value="laravel">Laravel</option><option value="php">PHP</option></select></label></div>
+        <details class="advanced"><summary>دامنه و آدرس بررسی سلامت</summary><div class="form-row"><label>دامنهٔ اختصاصی<input id="domain" placeholder="www.example.com" dir="ltr"></label><label>آدرس بررسی سلامت<input id="health" type="url" placeholder="https://my-website.liara.run" dir="ltr"></label></div></details>
+        <label class="message-label">چه کاری انجام دهیم؟<textarea id="message" rows="2" placeholder="این پروژه را بررسی و منتشر کن. پیش از تغییر، طرح را نشان بده." required></textarea></label>
+        <div class="form-footer"><p id="form-hint">سورس پیش از تأیید شما آپلود نمی‌شود.</p><button class="primary" id="submit" type="submit">بررسی و آماده‌سازی طرح <span aria-hidden="true">←</span></button></div>
+      </form>
+      <p id="error" class="error" role="alert" hidden></p>
+      <section id="run" class="operation" aria-live="polite" hidden>
+        <div class="operation-heading"><div><span class="small-label">مسیر عملیات</span><h2 id="run-title">بررسی پروژه</h2></div><span class="badge" id="run-status">در حال بررسی</span><button class="quiet" id="resume" hidden>بازیابی اجرای قطع‌شده</button></div>
+        <div class="run-tools"><button class="quiet" id="download-report">دریافت گزارش بررسی</button><button class="quiet" id="recheck" hidden>بررسی دوبارهٔ نتیجه</button><button class="quiet" id="repair" hidden>بررسی و اصلاح مانع انتشار</button><button class="quiet" id="recovery" hidden>طرح بازگشت به سورس پیشین</button><span id="run-parent" class="muted"></span></div>
+        <ol id="stages" class="stages"><li data-phase="inspect">بررسی</li><li data-phase="plan">طرح</li><li data-phase="approval">تأیید شما</li><li data-phase="execute">اجرا</li><li data-phase="verify">بررسی نتیجه</li></ol>
+        <div class="operation-body"><p id="summary"></p><div id="questions" class="questions"></div><form id="answer-form" class="answer-form" hidden><h3>ادامهٔ همین درخواست</h3><label>پاسخ شما<textarea id="answer-message" required rows="2" maxlength="3000" placeholder="پاسخ سؤال‌های بالا را اینجا بنویسید؛ کلید یا رمز نفرستید."></textarea></label><div class="form-row"><label id="answer-port-label">پورت انتخابی<input id="answer-port" type="number" min="1" max="65535" dir="ltr"></label><label id="answer-plan-label">شناسهٔ پلن انتخابی<input id="answer-plan" dir="ltr"></label><label id="answer-platform-label">پلتفرم انتخابی<select id="answer-platform"><option value="">تشخیص از پروژه</option><option value="node">Node.js</option><option value="static">Static</option><option value="python">Python</option><option value="docker">Docker</option><option value="django">Django</option><option value="flask">Flask</option><option value="next">Next.js</option><option value="php">PHP</option><option value="laravel">Laravel</option></select></label></div><p class="muted">درخواست و پروژه حفظ می‌شوند؛ طرح تازه پیش از اجرا دوباره به تأیید نیاز دارد.</p><button class="primary" id="send-answer" type="submit">ثبت پاسخ و ادامهٔ بررسی</button></form><div id="change-review"></div><div id="steps"></div><div id="artifact"></div><div id="repair-preview"></div><div id="approval" class="approval" hidden><div><h3>این تغییرات را اجرا کنیم؟</h3><p>فقط همین طرح برای همین برنامه اجرا می‌شود.</p><code id="approval-digest" dir="ltr"></code></div><div class="approval-buttons"><button id="approve" class="primary">تأیید و اجرای همین طرح</button><button id="reject" class="quiet">رد طرح</button></div></div><div id="verification"></div><div id="evidence"></div><details class="event-details"><summary>تاریخچهٔ مراحل</summary><ol id="events" class="events"></ol></details></div>
+      </section>
+      <section id="welcome" class="welcome"><div class="journey"><span>پروژهٔ شما</span><span class="journey-line"></span><span>طرح قابل بررسی</span><span class="journey-line"></span><span>انتشار و بررسی سلامت</span></div><p>برای انتشار اول آماده‌اید یا سایتی دارید که به بررسی نیاز دارد؟<br>از یک درخواست شروع کنید.</p><div class="examples"><button data-example="deploy">این پروژه را منتشر کن</button><button data-example="diagnose">سایتم خطای ۵۰۰ می‌دهد</button></div></section>
+    </section>
+  </main>
+  <dialog id="access-dialog"><form method="dialog"><div class="section-title"><h2>دسترسی و اتصال</h2><button class="icon-button" aria-label="بستن">×</button></div><p>کلید لیارا و تنظیمات مدل در فایل <bdi>.env</bdi> سرور نگهداری می‌شوند. این قسمت برای ورود به رابط است.</p><label>توکن دسترسی رابط<input id="access-token" type="password" autocomplete="current-password" dir="ltr"></label><button id="save-access" class="primary" value="save">اتصال</button><pre id="configuration" dir="ltr"></pre></form></dialog>
+</body>
+</html>

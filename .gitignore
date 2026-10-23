@@ -1,0 +1,11 @@
+.venv/
+.cache/
+.env
+.env.*
+!.env.example
+.lyara/
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/

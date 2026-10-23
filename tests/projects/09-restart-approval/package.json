@@ -1,0 +1,1 @@
+{"name":"local-restart-approval","private":true,"scripts":{"start":"node server.mjs"}}

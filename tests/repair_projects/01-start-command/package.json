@@ -1,0 +1,1 @@
+{"name":"lyara-repair-start","private":true,"type":"module","scripts":{"start":"node missing.mjs"}}
